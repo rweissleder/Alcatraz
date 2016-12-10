@@ -20,7 +20,6 @@ import common.IRMIClient;
 import java.util.InputMismatchException;
 import common.*;
 import common.ServerState.ClientRMIPos;
-import commontest.ClientInterface;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -40,25 +39,12 @@ public class AlcatrazClient implements MoveListener, Runnable{
     private HashMap<String, String> opts;
     private HashMap<String, ServerState.ClientRMIPos> clients;
     private RMIClientImpl clientRMI;
-    private String clientRMIString;
     private IAlcatrazServer regserver;
     private Alcatraz alca;
-    private int position;
-    private Alcatraz other[] = new Alcatraz[4];
+    
+    
     private String username = "player";
-    
-    public String[] rmiArray() {
-        String rmi[] = new String[3];
-        rmi[0]="rmi://";        
-        rmi[1]="rmi://";
-        rmi[2]="rmi://";
-        rmi[3]="rmi://";
-        return rmi;
-    }  
-    
-    
-    //anzahl spilere mit denen will ich spiel starten
-    private int numPlayer = 2;
+    private int numPlayer = 3;
     private int port = 11001;
     
     private int gamestep = 0;
@@ -89,7 +75,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
                 //do nothing
             }
         }
-       // this.gameDrawBufferWatcher();
+        this.gameDrawBufferWatcher();
     }
     
     private class RegServerParams{
@@ -112,92 +98,41 @@ public class AlcatrazClient implements MoveListener, Runnable{
     public void setNumPlayer(int numPlayer) {
         this.numPlayer = numPlayer;
     }
-    public void setOther(int i, Alcatraz t){
-        this.other[i]=t;
-    }
 
+    public void moveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) {
+        this.gamestep++;
+        this.clientRMI.drawbuf.add(new GameDraw(gamestep, player, prisoner, rowOrCol, row, col));
+        int i=0;
+        Iterator it = this.clients.entrySet().iterator();
+        while(it.hasNext()){
+            ClientRMIPos r = (ClientRMIPos)((Map.Entry)it.next()).getValue();
+            try {
+                // last saved draw of remote client 
+                i = r.getRMI().performMove(player, prisoner, rowOrCol, row, col, this.gamestep);
+                if(i<this.gamestep){
+                    while(i<this.gamestep){
+                        i++;
+                        i = r.getRMI().performMove(this.clientRMI.drawbuf.get(i).getPlayer(), 
+                                this.clientRMI.drawbuf.get(i).getPrisoner(), 
+                                this.clientRMI.drawbuf.get(i).getRowOrCol(),
+                                this.clientRMI.drawbuf.get(i).getRow(), 
+                                this.clientRMI.drawbuf.get(i).getCol(),
+                                this.clientRMI.drawbuf.get(i).getGamestep());
+                    }        
+                }
+            } catch (RemoteException ex) {
+                Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
+                i=0;
+                continue;
+            }
+            i=0;
+        }
+     }
+    
     public void gameWon(Player player) {
         System.out.println("Player " + player.getId() + " wins.");
     }
 
-    public void moveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) {
-        try { 
-            otherMoveDone(player, prisoner, rowOrCol, row, col);
-        } catch (InterruptedException ex) {
-         //   Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-        }
-            ownMoveDone(player, prisoner, rowOrCol, row, col);
-     }
-    
-        //Sendet Remote Aufruf für Move an alle Spieler
-    public void otherMoveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) throws InterruptedException /*throws NotBoundException, MalformedURLException, RemoteException*/ {
-        //Übergabe RMI Aufrufe 
-        String rmi[] = rmiArray();
-        boolean lookup=false;
-        int attempt = 1;
-        for (int k = 0; k < getNumPlayer(); k++) {   //Geht rmi Array durch und schickt rmi dorthin
-            if (k != player.getId()) {   //exkludiert Spieler, der den Move macht (dem muss man RMI nicht schicken)
-                while (lookup==false) {
-                    try {  
-                        ClientInterface remoteinterface = (ClientInterface) Naming.lookup(rmi[k]); //rmi Array           
-                        remoteinterface.remoteMoveDone(player, prisoner, rowOrCol, row, col);
-                        System.out.println("Successfully done RMI "+rmi[k]);
-                        lookup = true;
-                    } catch (Exception ex) {
-                        lookup=false;                    
-                        System.out.println(attempt+": Trying to reach Player "+k+": "+rmi[k]+": "+ex);
-                        attempt++;
-                        Thread.sleep(5000);
-                        // Logger.getLogger(Test.class.getName()).log(Level.SEVERE, null, ex);
-                      }  
-                }
-            }       
-        }   
-    }
-    
-       //Methode empfängt Move und führt diesen Remote bei anderen Spielern durch
-    public void remoteMoveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) throws RemoteException {
-        String rmi[] = rmiArray(); 
-        //doMove wird für ID des Spielers durchgeführt dessen Zug übergeben wurde
-        int i = player.getId();
-        other[i].doMove(other[i].getPlayer(player.getId()), other[i].getPrisoner(prisoner.getId()), rowOrCol, row, col);
-        System.out.println("Doing remote Move: i="+i+" "+other[i].getPlayer(player.getId())+" - rowOrCol:"+rowOrCol+" row:"+row+"col:"+col);
-        //Jetzt schicke ich Nachrichten-Kopien an Alle außer mich und den Spieler der Move macht        
-        //Damit finde ich heraus welche ID ich habe
-        int myId = 0;
-        for (int k = 0; k < getNumPlayer(); k++) {
-            if (other[k]==null) {
-                myId = k;  // Das ist meine Player ID
-            }
-        }
-        //NACHRICHTEN KOPIEN WERDEN GESENDET
-        for (int k = 0; k < getNumPlayer(); k++) {   
-            if (k != player.getId() && k!=myId) {   //Ungleich meine ID und ID des Spielers der Move macht
-                try {
-                    ClientInterface messageCopyInterface = (ClientInterface) Naming.lookup(rmi[k]); //rmi Array           
-                    messageCopyInterface.messageCopy(player, prisoner, rowOrCol, row, col); 
-                } catch (RemoteException | MalformedURLException | NotBoundException ex) {
-           //             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
-                }
-            }       
-        }
-    }
-    
-    //EMPFÄNGT NACHRICHTEN-KOPIE UND FÜHRT MOVE AUS / RELIABILITY
-    //Falls Sender während Senden abstürzt
-    public void messageCopy(Player player, Prisoner prisoner, int rowOrCol, int row, int col) throws RemoteException {
-        int i = player.getId();
-            other[i].doMove(other[i].getPlayer(player.getId()), other[i].getPrisoner(prisoner.getId()), rowOrCol, row, col);
-            System.out.println("Received messageCopy: i="+i+" "+other[i].getPlayer(player.getId())+" - rowOrCol:"+rowOrCol+" row:"+row+"col:"+col);
-      }
-    
-    //wird zuletzt aufgerufen und ist der Abschluss des Moves
-    public void ownMoveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) {
-        System.out.println("Own Move: moving " + prisoner + " to " + (rowOrCol == Alcatraz.ROW ? "row" : "col") + " " + (rowOrCol == Alcatraz.ROW ? row : col));
-    }
-    
-    
-    
     public void setUsername(String username){
         
         this.username=username;
@@ -206,7 +141,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
         return this.username;
     }
     
-    /*public void gameDrawBufferWatcher(){
+    public void gameDrawBufferWatcher(){
 
         while(true){
             try {
@@ -226,12 +161,12 @@ public class AlcatrazClient implements MoveListener, Runnable{
                 break;
             }
         }
-    }*/
+    }
  
     /**
      * @param args Command line args
      */
-    public static void main(String[] args) throws MalformedURLException, java.net.UnknownHostException{
+    public static void main(String[] args) throws MalformedURLException{
         
         String [] ServerList;
         ServerList = new String[3];
@@ -245,16 +180,6 @@ public class AlcatrazClient implements MoveListener, Runnable{
         
         
         AlcatrazClient client = new AlcatrazClient();
-        System.out.println("Please enter your username: ");
-        Scanner usernamescan = new Scanner(System.in);
-        client.username = usernamescan.next();
-        System.out.println("Do you want to start a 2,3 or 4 Player game?");
-        Scanner numPlayerscan = new Scanner(System.in);
-        client.numPlayer = numPlayerscan.nextInt();
-        
-        
-                
-                
         if(args.length>0){
             try {
                 client.parseConfigFile(args[1]);
@@ -265,8 +190,21 @@ public class AlcatrazClient implements MoveListener, Runnable{
         InetAddress address; 
         Thread t = new Thread(client);
         t.start();
-        if(!client.connectToServer(ServerList)){
-            System.out.println("No servers available.");
+        Registry registry;
+        
+        for(int i=0; i<=1; i++){
+            
+            try{
+            registry = LocateRegistry.getRegistry("rmi://" + ServerList[i] + ":1099");
+            client.setRegServer((IAlcatrazServer) Naming.lookup(ServerList[i]));        
+            System.out.println("RMI OK");
+            System.out.println("Verbunden mit Server " + ServerList[i]);
+            primaryRMI=ServerList[i];
+            break;
+            }
+            catch(Exception e){
+            System.out.println("Server " + i + " not reachable");
+        }
         }
         try {
             // connecting to rmi registry of primary server
@@ -278,68 +216,30 @@ public class AlcatrazClient implements MoveListener, Runnable{
                 System.out.println("Error by registering");
                 System.exit(1);
             }
-            while(t.isAlive()){
-                try{
-                    while(!client.regserver.isTeamReady(client.username)){
-                        Thread.sleep(300);
-                    }
-                    break;
-                }catch(RemoteException e){
-                    System.out.println("Primary is unreachable. Reconecting to backup(s).");
-                    if(!client.connectToServer(ServerList)){
-                        System.out.println("No servers available.");
-                        System.exit(0);
-                    }
-                    continue;
+            while(!client.regserver.isTeamReady(client.username)){
+                if(!t.isAlive()){
+                    System.out.println("Execution terminated.");
+                    System.exit(0);
                 }
+                Thread.sleep(300);
             }
             if(client.receivePlayersInterfaces() < 0){
                 System.out.println("Error by game start");
                 System.exit(1);
             }
             t.interrupt();
-            client.startGame(client.numPlayer, client.position);
-        } catch ( InterruptedException ex) {
+            client.startGame();
+        } catch (RemoteException | InterruptedException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
-    private boolean connectToServer(String[] ServerList){
-        Registry registry;
-        String primaryRMI;
-        for(int i=0; i<=1; i++){
-            
-            try{
-                registry = LocateRegistry.getRegistry("rmi://" + ServerList[i] + ":1099");
-                this.setRegServer((IAlcatrazServer) Naming.lookup(ServerList[i]));        
-                System.out.println("RMI OK");
-                System.out.println("Verbunden mit Server " + ServerList[i]);
-                primaryRMI=ServerList[i];
-                return true;
-            }
-            catch(Exception e){
-                System.out.println("Server " + i + " not reachable");
-                continue;
-            }
-        }
-        return false;
-    } 
-    private int regToGame() throws java.net.UnknownHostException{
-        int randomPort = (int)(Math.random() * 1000) + 1090;
-        
+    
+    private int regToGame(){
         try{
-           InetAddress address = InetAddress.getLocalHost(); 
-           String hostIP = address.getHostAddress() ;    //ermittelt IP Adresse von Spieler 
-           clientRMI.RMIPort = randomPort;
-           clientRMI.RMIString = "rmi://"+hostIP + ":"+ randomPort +"/" + this.username;
-           
-           System.out.println(clientRMI.RMIPort);
-           
-                    
-            LinkedList<String> playernames = regserver.register(clientRMI, username, numPlayer, clientRMI.RMIString);
+            LinkedList<String> playernames = regserver.register(clientRMI, username, numPlayer,"");
             if(playernames.size() > 0){
                 System.out.println("List of other players already waiting:");
                 System.out.print(playernames);
-                
                 return playernames.size();
             }else
             {
@@ -360,22 +260,12 @@ public class AlcatrazClient implements MoveListener, Runnable{
         }
         return 0;
     } 
-    void startGame(int playerCount, int position){
-       /* this.alca = new Alcatraz();
-        System.out.println(numPlayer);
-        System.out.println(this.clients.get(this.username).getPos());
-       // System.out.println()
-                
-       this.alca.init(numPlayer, this.clients.get(this.username).getPos());      
-       // this.alca.init(2, 2);
-
+    void startGame(){
+        this.alca = new Alcatraz();
+        this.alca.init(numPlayer, this.clients.get(this.username).getPos());
         Iterator it = this.clients.entrySet().iterator();
         this.alca.addMoveListener(this);
-        this.alca.start();*/
-    
-       
-      // client.setOther(2,this.alca);
-       
+        this.alca.start();
     }
     public void parseConfigFile(String config) throws IOException{
         Wini ini = new Wini(new File(config));
