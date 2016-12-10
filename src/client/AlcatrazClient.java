@@ -38,7 +38,7 @@ import org.ini4j.Wini;
  */
 public class AlcatrazClient implements MoveListener, Runnable{
     private HashMap<String, String> opts;
-    private HashMap<String, ServerState.ClientRMIPos> clients;
+    private HashMap<String, String> clients;
     private RMIClientImpl clientRMI;
     private String clientRMIString;
     private IAlcatrazServer regserver;
@@ -46,15 +46,16 @@ public class AlcatrazClient implements MoveListener, Runnable{
     private int position;
     private Alcatraz other[] = new Alcatraz[4];
     private String username = "player";
-    
-    public String[] rmiArray() {
+    public String rmi[] = new String[3];
+    public int ownPosition;
+    /*public String[] rmiArray() {
         String rmi[] = new String[3];
         rmi[0]="rmi://";        
         rmi[1]="rmi://";
         rmi[2]="rmi://";
         rmi[3]="rmi://";
         return rmi;
-    }  
+    }*/  
     
     
     //anzahl spilere mit denen will ich spiel starten
@@ -132,7 +133,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
         //Sendet Remote Aufruf für Move an alle Spieler
     public void otherMoveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) throws InterruptedException /*throws NotBoundException, MalformedURLException, RemoteException*/ {
         //Übergabe RMI Aufrufe 
-        String rmi[] = rmiArray();
+       // String rmi[] = rmiArray();
         boolean lookup=false;
         int attempt = 1;
         for (int k = 0; k < getNumPlayer(); k++) {   //Geht rmi Array durch und schickt rmi dorthin
@@ -157,7 +158,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
     
        //Methode empfängt Move und führt diesen Remote bei anderen Spielern durch
     public void remoteMoveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) throws RemoteException {
-        String rmi[] = rmiArray(); 
+       // String rmi[] = rmiArray(); 
         //doMove wird für ID des Spielers durchgeführt dessen Zug übergeben wurde
         int i = player.getId();
         other[i].doMove(other[i].getPlayer(player.getId()), other[i].getPrisoner(prisoner.getId()), rowOrCol, row, col);
@@ -361,20 +362,60 @@ public class AlcatrazClient implements MoveListener, Runnable{
         return 0;
     } 
     void startGame(int playerCount, int position){
-       /* this.alca = new Alcatraz();
-        System.out.println(numPlayer);
-        System.out.println(this.clients.get(this.username).getPos());
-       // System.out.println()
-                
-       this.alca.init(numPlayer, this.clients.get(this.username).getPos());      
-       // this.alca.init(2, 2);
-
-        Iterator it = this.clients.entrySet().iterator();
-        this.alca.addMoveListener(this);
-        this.alca.start();*/
-    
        
+       AlcatrazClient sub1 = new AlcatrazClient();
+       
+        
+       String[] clientNames = new String[clients.size()];
+       String[] clientRMIS = new String[clients.size()];
+       
+       int index = 0;
+       for (Map.Entry<String, String> mapEntry : clients.entrySet()){
+           clientNames[index]= mapEntry.getKey();
+           clientRMIS[index]= mapEntry.getValue();
+           index++;
+       }
+       
+       for(int i = 0; i< numPlayer; i++){
+           System.out.println(username);
+           System.out.println(clientNames[i]);
+           if(clientNames[i].equals(username)){
+              ownPosition = i;
+       System.out.println("Own Position: " + ownPosition);
+           }
+           
+           sub1.rmi[i] = clientRMIS[i];
+           
+           System.out.println("Player " + clientNames[i] + " via " + rmi[i]);
+           
+       }
+       
+      // clients.keySet().toArray();
+      // clients.values().toArray();
       // client.setOther(2,this.alca);
+      
+       //TO DO wie kann ich den Namen des anderen Spielers bekommen?
+        //TO DO getPos ist immer 3....
+        //TO DO RMI Strings an alle Clients schicken
+        
+       //Logik für Spielstart
+       Alcatraz alca = new Alcatraz();
+       sub1.setNumPlayer(numPlayer); 
+       
+       alca.init(numPlayer,ownPosition);   //hier meine Nummer eintragen
+       alca.getPlayer(ownPosition).setName(username);
+       for(int i=0;i<numPlayer;i++){
+          alca.getPlayer(i).setName(clientNames[i]);
+          
+          if(i!=ownPosition){
+             sub1.setOther(i, alca);             
+          }
+       System.out.println("Spieler " + (i+1) + ": " + clientNames[i] + ", Position: " + i);
+       }
+
+       alca.showWindow();
+       alca.addMoveListener(sub1);    
+       alca.start();
        
     }
     public void parseConfigFile(String config) throws IOException{
