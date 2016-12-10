@@ -40,17 +40,20 @@ public class AlcatrazClient implements MoveListener, Runnable{
     private HashMap<String, ServerState.ClientRMIPos> clients;
     private RMIClientImpl clientRMI;
     private IAlcatrazServer regserver;
-    private Alcatraz alca;
+    private static Alcatraz alca;
     
     
-    private String username = "player";
-    private int numPlayer = 3;
+    private String username = "playerDD";
+    
+    //total amount of players
+    private int numPlayer = 2;
     private int port = 11001;
     
     private int gamestep = 0;
     
     public AlcatrazClient(){
-        clientRMI = new RMIClientImpl();
+        AlcatrazClient.alca = new Alcatraz();
+        clientRMI = new RMIClientImpl(AlcatrazClient.alca);
         servers = new LinkedList<>();
         servers.add(new RegServerParams());
     }
@@ -99,6 +102,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
         this.numPlayer = numPlayer;
     }
 
+    @Override
     public void moveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) {
         this.gamestep++;
         this.clientRMI.drawbuf.add(new GameDraw(gamestep, player, prisoner, rowOrCol, row, col));
@@ -169,10 +173,10 @@ public class AlcatrazClient implements MoveListener, Runnable{
     public static void main(String[] args) throws MalformedURLException{
         
         String [] ServerList;
-        ServerList = new String[3];
-        ServerList[0]="rmi://192.168.0.100:1099/Server0";
-        ServerList[1]="rmi://192.168.0.101:1099/Server1";
-        ServerList[2]="rmi://192.168.0.102:1099/Server2";
+        ServerList = new String[1];
+        ServerList[0]="rmi://192.168.0.102:1099/Server2";
+//        ServerList[1]="rmi://192.168.0.101:1099/Server1";
+//        ServerList[2]="rmi://192.168.0.102:1099/Server2";
 
         
         String primaryRMI=null;
@@ -192,19 +196,8 @@ public class AlcatrazClient implements MoveListener, Runnable{
         t.start();
         Registry registry;
         
-        for(int i=0; i<=1; i++){
-            
-            try{
-            registry = LocateRegistry.getRegistry("rmi://" + ServerList[i] + ":1099");
-            client.setRegServer((IAlcatrazServer) Naming.lookup(ServerList[i]));        
-            System.out.println("RMI OK");
-            System.out.println("Verbunden mit Server " + ServerList[i]);
-            primaryRMI=ServerList[i];
-            break;
-            }
-            catch(Exception e){
-            System.out.println("Server " + i + " not reachable");
-        }
+        if(!client.connectToServer(ServerList)){
+            System.out.println("No servers available.");
         }
         try {
             // connecting to rmi registry of primary server
@@ -216,12 +209,20 @@ public class AlcatrazClient implements MoveListener, Runnable{
                 System.out.println("Error by registering");
                 System.exit(1);
             }
-            while(!client.regserver.isTeamReady(client.username)){
-                if(!t.isAlive()){
-                    System.out.println("Execution terminated.");
-                    System.exit(0);
+            while(t.isAlive()){
+                try{
+                    while(!client.regserver.isTeamReady(client.username)){
+                        Thread.sleep(300);
+                    }
+                    break;
+                }catch(RemoteException e){
+                    System.out.println("Primary is unreachable. Reconecting to backup(s).");
+                    if(!client.connectToServer(ServerList)){
+                        System.out.println("No servers available.");
+                        System.exit(0);
+                    }
+                    continue;
                 }
-                Thread.sleep(300);
             }
             if(client.receivePlayersInterfaces() < 0){
                 System.out.println("Error by game start");
@@ -229,11 +230,30 @@ public class AlcatrazClient implements MoveListener, Runnable{
             }
             t.interrupt();
             client.startGame();
-        } catch (RemoteException | InterruptedException ex) {
+        } catch (InterruptedException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
-    
+    private boolean connectToServer(String[] ServerList){
+        Registry registry;
+        String primaryRMI;
+        for(int i=0; i<=1; i++){
+            
+            try{
+                registry = LocateRegistry.getRegistry("rmi://" + ServerList[i] + ":1099");
+                this.setRegServer((IAlcatrazServer) Naming.lookup(ServerList[i]));        
+                System.out.println("RMI OK");
+                System.out.println("Verbunden mit Server " + ServerList[i]);
+                primaryRMI=ServerList[i];
+                return true;
+            }
+            catch(Exception e){
+                System.out.println("Server " + i + " not reachable");
+                continue;
+            }
+        }
+        return false;
+    } 
     private int regToGame(){
         try{
             LinkedList<String> playernames = regserver.register(clientRMI, username, numPlayer,"");
@@ -260,19 +280,20 @@ public class AlcatrazClient implements MoveListener, Runnable{
         }
         return 0;
     } 
+    
     void startGame(){
-        this.alca = new Alcatraz();
         this.alca.init(numPlayer, this.clients.get(this.username).getPos());
         Iterator it = this.clients.entrySet().iterator();
         this.alca.addMoveListener(this);
+        this.alca.showWindow();
         this.alca.start();
     }
+    
     public void parseConfigFile(String config) throws IOException{
         Wini ini = new Wini(new File(config));
         this.username = ini.get("client", "name");
         this.numPlayer = ini.get("client", "playercount", int.class);
     }
-    
     
 
 }

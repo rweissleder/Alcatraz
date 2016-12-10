@@ -121,19 +121,24 @@ public class AlcatrazServer implements Serializable, Remote {
             GroupName = br.readLine();
             String srv1_ip = br.readLine();
             String srv1_name = br.readLine();
-            String srv2_ip = br.readLine();
-            String srv2_name = br.readLine();
+//            String srv2_ip = br.readLine();
+//            String srv2_name = br.readLine();
+//            String srv3_ip = br.readLine();
+//            String srv3_name = br.readLine();
             br.close();
-            System.out.println("Reading Spread config... "+srv1_name+": "+srv1_ip+"; "+srv2_name+": "+srv2_ip+"; ");
+            System.out.println("Reading Spread config... "+srv1_name+": "+srv1_ip+"; ");//+srv2_name+": "+srv2_ip+"; "+srv3_name+": "+srv3_ip+"; ");
 
             if (_serverHost.equals(srv1_ip)) {
                 _serverName = srv1_name;    
                 System.out.println("PrimaryServer / Name within SpreadGroup is: "+_serverName);
             }
-            else if (_serverHost.equals(srv2_ip)){
-                _serverName = srv2_name;    
-                System.out.println("BackupServer / Name within SpreadGroup is: "+_serverName);
-            }
+//            else if (_serverHost.equals(srv2_ip)){
+//                _serverName = srv2_name;    
+//                System.out.println("BackupServer / Name within SpreadGroup is: "+_serverName);
+//            }else if (_serverHost.equals(srv3_ip)) {
+//                _serverName = srv3_name;    
+//                System.out.println("PrimaryServer / Name within SpreadGroup is: "+_serverName);
+//            }
             else {
                 System.out.println("IP-Address not in Spread config");
             }

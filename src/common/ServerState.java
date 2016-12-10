@@ -73,7 +73,7 @@ public class ServerState implements Cloneable, Serializable {
                     return false;
                 }
                 int i = queue[playercount-1].size();
-                queue[playercount-1].put(name, new ClientRMIPos(p, queue.length));
+                queue[playercount-1].put(name, new ClientRMIPos(p, queue[playercount-1].size()));
                 regNames.put(name, playercount - 1);
                 generation++;
                 return true;
