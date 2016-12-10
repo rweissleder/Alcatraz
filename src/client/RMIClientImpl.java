@@ -25,21 +25,19 @@ import java.util.LinkedList;
  * @author rweis
  */
 public class RMIClientImpl implements IRMIClient, Serializable{
-    Alcatraz myalca;
+    //Alcatraz myalca;
     
     public LinkedList<GameDraw> drawbuf = new LinkedList<>();
     String RMIString;
     int RMIPort;
     
-    public RMIClientImpl(Alcatraz alca){
-        myalca = alca;
-    }
+    
     public int performMove(Player player, Prisoner prisoner, int rowOrCol, int row, int col, int gamestep) throws RemoteException { 
         if(this.drawbuf.size() < gamestep-1){
             return gamestep;
         }
         drawbuf.add(new GameDraw(gamestep, player, prisoner, rowOrCol, row, col));
-        myalca.doMove(player, prisoner, rowOrCol, row, col);
+        //myalca.doMove(player, prisoner, rowOrCol, row, col);
         return this.drawbuf.size();
     }
     

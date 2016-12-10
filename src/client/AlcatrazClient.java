@@ -40,7 +40,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
     private HashMap<String, ServerState.ClientRMIPos> clients;
     private RMIClientImpl clientRMI;
     private IAlcatrazServer regserver;
-    private static Alcatraz alca;
+    private Alcatraz alca;
     
     
     private String username = "playerDD";
@@ -52,8 +52,8 @@ public class AlcatrazClient implements MoveListener, Runnable{
     private int gamestep = 0;
     
     public AlcatrazClient(){
-        AlcatrazClient.alca = new Alcatraz();
-        clientRMI = new RMIClientImpl(AlcatrazClient.alca);
+        
+        clientRMI = new RMIClientImpl();
         servers = new LinkedList<>();
         servers.add(new RegServerParams());
     }
@@ -282,6 +282,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
     } 
     
     void startGame(){
+        this.alca = new Alcatraz();
         this.alca.init(numPlayer, this.clients.get(this.username).getPos());
         Iterator it = this.clients.entrySet().iterator();
         this.alca.addMoveListener(this);
