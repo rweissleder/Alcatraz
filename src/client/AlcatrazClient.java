@@ -41,7 +41,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
     private RMIClientImpl clientRMI;
     private IAlcatrazServer regserver;
     private Alcatraz alca;
-    
+    private InputScanner scanner;
     
     private String username = "playerDD";
     
@@ -56,31 +56,13 @@ public class AlcatrazClient implements MoveListener, Runnable{
         clientRMI = new RMIClientImpl();
         servers = new LinkedList<>();
         servers.add(new RegServerParams());
-    }
-    @Override
-    public void run() {
-        Scanner scn = new Scanner(System.in);
-        System.out.println("Print exit to cancel registration process and terminate program");
-        try{
-            while(scn.hasNext()){
-                if(scn.next().equals("exit")){
-                    if(this.regserver.unregister(username) != 0){
-                        throw new RemoteException();
-                    }
-                    break;
-                }
-            }
-        } catch (RemoteException ex) {
-            Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
-            System.out.println("Couldn't unregister");
-        }catch (Exception e){
-            if(e instanceof InterruptedException){
-                //do nothing
-            }
-        }
-        this.gameDrawBufferWatcher();
+        scanner = new InputScanner();
     }
     
+    @Override
+    public void run(){
+       drawBufWatcher(); 
+    }
     private class RegServerParams{
         private String regservername = "RegServer";
         private String regserverip = "127.0.0.1";
@@ -145,27 +127,6 @@ public class AlcatrazClient implements MoveListener, Runnable{
         return this.username;
     }
     
-    public void gameDrawBufferWatcher(){
-
-        while(true){
-            try {
-                if(!this.clientRMI.drawbuf.isEmpty()){
-                    if(this.clientRMI.drawbuf.size() > this.gamestep){
-                        this.alca.doMove(this.clientRMI.drawbuf.getLast().getPlayer(), 
-                                this.clientRMI.drawbuf.getLast().getPrisoner(),
-                                this.clientRMI.drawbuf.getLast().getRowOrCol(),
-                                this.clientRMI.drawbuf.getLast().getRow(), 
-                                this.clientRMI.drawbuf.getLast().getCol());
-                        this.gamestep++;
-                    }
-                }
-                Thread.sleep(250);
-            } catch (InterruptedException ex) {
-                Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
-                break;
-            }
-        }
-    }
  
     /**
      * @param args Command line args
@@ -174,7 +135,8 @@ public class AlcatrazClient implements MoveListener, Runnable{
         
         String [] ServerList;
         ServerList = new String[1];
-        ServerList[0]="rmi://192.168.0.102:1099/Server2";
+        ServerList[0]="rmi://192.168.244.198:1099/Server2";
+        //ServerList[0]="rmi://192.168.0.102:1099/Server2";
 //        ServerList[1]="rmi://192.168.0.101:1099/Server1";
 //        ServerList[2]="rmi://192.168.0.102:1099/Server2";
 
@@ -192,7 +154,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
             }
         }
         InetAddress address; 
-        Thread t = new Thread(client);
+        Thread t = new Thread(client.scanner);
         t.start();
         Registry registry;
         
@@ -228,7 +190,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
                 System.out.println("Error by game start");
                 System.exit(1);
             }
-            t.interrupt();
+            t.stop();
             client.startGame();
         } catch (InterruptedException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
@@ -287,6 +249,8 @@ public class AlcatrazClient implements MoveListener, Runnable{
         Iterator it = this.clients.entrySet().iterator();
         this.alca.addMoveListener(this);
         this.alca.showWindow();
+        Thread watcher = new Thread(this);
+        watcher.start();
         this.alca.start();
     }
     
@@ -296,5 +260,46 @@ public class AlcatrazClient implements MoveListener, Runnable{
         this.numPlayer = ini.get("client", "playercount", int.class);
     }
     
-
+    private class InputScanner implements Runnable{
+        
+        @Override
+        public void run() {
+            Scanner scn = new Scanner(System.in);
+            System.out.println("Print exit to cancel registration process and terminate program");
+            try{
+                while(scn.hasNext()){
+                    if(scn.next().equals("exit")){
+                        if(regserver.unregister(username) != 0){
+                            throw new RemoteException();
+                        }
+                        break;
+                    }
+                }
+            } catch (RemoteException ex) {
+                Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
+                System.out.println("Couldn't unregister");
+            }catch (Exception e){
+                if(e instanceof InterruptedException){
+                }
+            }
+        }
+    }
+    public void drawBufWatcher(){
+        int size = this.clientRMI.drawbuf.size();
+        try{
+            while(true){
+                if(size != this.clientRMI.drawbuf.size()){
+                    this.alca.doMove(this.clientRMI.drawbuf.getLast().getPlayer(), 
+                            this.clientRMI.drawbuf.getLast().getPrisoner(), 
+                            this.clientRMI.drawbuf.getLast().getRowOrCol(), 
+                            this.clientRMI.drawbuf.getLast().getRow(), 
+                            this.clientRMI.drawbuf.getLast().getCol());
+                    size = this.clientRMI.drawbuf.size();
+                    Thread.sleep(300);
+                }
+            }
+        }catch(InterruptedException e){
+            return;
+        }
+    }
 }
