@@ -51,6 +51,8 @@ public class AlcatrazClient implements MoveListener, Runnable{
     
     private int gamestep = 0;
     
+    private Thread watcher;
+    
     public AlcatrazClient(){
         
         clientRMI = new RMIClientImpl();
@@ -91,7 +93,10 @@ public class AlcatrazClient implements MoveListener, Runnable{
         int i=0;
         Iterator it = this.clients.entrySet().iterator();
         while(it.hasNext()){
-            ClientRMIPos r = (ClientRMIPos)((Map.Entry)it.next()).getValue();
+            Map.Entry<String, ClientRMIPos> entry = (Map.Entry)it.next();
+            if(entry.getKey().equals(this.username))
+                continue;
+            ClientRMIPos r = (ClientRMIPos)entry.getValue();
             try {
                 // last saved draw of remote client 
                 i = r.getRMI().performMove(player, prisoner, rowOrCol, row, col, this.gamestep);
@@ -135,7 +140,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
         
         String [] ServerList;
         ServerList = new String[1];
-        ServerList[0]="rmi://192.168.244.198:1099/Server2";
+        ServerList[0]="rmi://192.168.245.185:1099/Server2";
         //ServerList[0]="rmi://192.168.0.102:1099/Server2";
 //        ServerList[1]="rmi://192.168.0.101:1099/Server1";
 //        ServerList[2]="rmi://192.168.0.102:1099/Server2";
@@ -247,9 +252,9 @@ public class AlcatrazClient implements MoveListener, Runnable{
         this.alca = new Alcatraz();
         this.alca.init(numPlayer, this.clients.get(this.username).getPos());
         Iterator it = this.clients.entrySet().iterator();
-        this.alca.addMoveListener(this);
         this.alca.showWindow();
-        Thread watcher = new Thread(this);
+        this.alca.addMoveListener(this);
+        watcher = new Thread(this);
         watcher.start();
         this.alca.start();
     }
