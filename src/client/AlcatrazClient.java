@@ -36,7 +36,7 @@ import org.ini4j.Wini;
  * A test class initializing a local Alcatraz game -- illustrating how
  * to use the Alcatraz API.
  */
-public class AlcatrazClient implements MoveListener, Runnable{
+public class AlcatrazClient implements MoveListener, Runnable, Remote{
     private HashMap<String, String> opts;
     private HashMap<String, String> clients;
     private RMIClientImpl clientRMI;
@@ -48,6 +48,9 @@ public class AlcatrazClient implements MoveListener, Runnable{
     private String username = "player";
     public String rmi[] = new String[3];
     public int ownPosition;
+    public static int randomPort = (int)(Math.random() * 1000) + 1090;
+    public static InetAddress address; 
+   // public static String IPaddr = (String) address.getHostAddress();
     /*public String[] rmiArray() {
         String rmi[] = new String[3];
         rmi[0]="rmi://";        
@@ -64,7 +67,9 @@ public class AlcatrazClient implements MoveListener, Runnable{
     
     private int gamestep = 0;
     
-    public AlcatrazClient(){
+    public AlcatrazClient() throws java.net.UnknownHostException{
+        // IPString;
+        //this.address = InetAddress.getLocalHost();
         clientRMI = new RMIClientImpl();
         servers = new LinkedList<>();
         servers.add(new RegServerParams());
@@ -134,7 +139,34 @@ public class AlcatrazClient implements MoveListener, Runnable{
     public void otherMoveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) throws InterruptedException /*throws NotBoundException, MalformedURLException, RemoteException*/ {
         //Übergabe RMI Aufrufe 
        // String rmi[] = rmiArray();
-        boolean lookup=false;
+      
+        boolean lookup = false;
+        int attempt = 1;
+        System.out.println(clients);
+        for (Map.Entry entry : this.clients.entrySet()) {
+            final String name = (String) entry.getKey();
+            final String location = (String) entry.getValue();
+
+            
+                        if (name != this.username) {   //exkludiert Spieler, der den Move macht (dem muss man RMI nicht schicken)
+                while (lookup==false) {
+                    try {  
+                        ClientInterface remoteinterface = (ClientInterface) Naming.lookup(name); //rmi Array           
+                        remoteinterface.remoteMoveDone(player, prisoner, rowOrCol, row, col);
+                        System.out.println("Successfully done RMI "+name);
+                        lookup = true;
+                    } catch (Exception ex) {
+                         
+                        lookup=false;                    
+                        System.out.println(attempt +": Trying to reach Player "+ name+": "+location+": "+ex);
+                        attempt++;
+                        Thread.sleep(5000);
+                        // Logger.getLogger(Test.class.getName()).log(Level.SEVERE, null, ex);
+                      }  
+                }
+            } 
+        }
+      /*  boolean lookup=false;
         int attempt = 1;
         for (int k = 0; k < getNumPlayer(); k++) {   //Geht rmi Array durch und schickt rmi dorthin
             if (k != player.getId()) {   //exkludiert Spieler, der den Move macht (dem muss man RMI nicht schicken)
@@ -145,21 +177,23 @@ public class AlcatrazClient implements MoveListener, Runnable{
                         System.out.println("Successfully done RMI "+rmi[k]);
                         lookup = true;
                     } catch (Exception ex) {
+                         
                         lookup=false;                    
-                        System.out.println(attempt+": Trying to reach Player "+k+": "+rmi[k]+": "+ex);
+                        System.out.println("DES GEHT NED" + rmi[k] + attempt +": Trying to reach Player "+k+": "+rmi[k]+": "+ex);
                         attempt++;
                         Thread.sleep(5000);
                         // Logger.getLogger(Test.class.getName()).log(Level.SEVERE, null, ex);
                       }  
                 }
             }       
-        }   
+        } */  
     }
     
        //Methode empfängt Move und führt diesen Remote bei anderen Spielern durch
     public void remoteMoveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) throws RemoteException {
        // String rmi[] = rmiArray(); 
         //doMove wird für ID des Spielers durchgeführt dessen Zug übergeben wurde
+      
         int i = player.getId();
         other[i].doMove(other[i].getPlayer(player.getId()), other[i].getPrisoner(prisoner.getId()), rowOrCol, row, col);
         System.out.println("Doing remote Move: i="+i+" "+other[i].getPlayer(player.getId())+" - rowOrCol:"+rowOrCol+" row:"+row+"col:"+col);
@@ -175,7 +209,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
         for (int k = 0; k < getNumPlayer(); k++) {   
             if (k != player.getId() && k!=myId) {   //Ungleich meine ID und ID des Spielers der Move macht
                 try {
-                    ClientInterface messageCopyInterface = (ClientInterface) Naming.lookup(rmi[k]); //rmi Array           
+                    ClientInterface messageCopyInterface = (ClientInterface) Naming.lookup(this.rmi[k]); //rmi Array           
                     messageCopyInterface.messageCopy(player, prisoner, rowOrCol, row, col); 
                 } catch (RemoteException | MalformedURLException | NotBoundException ex) {
            //             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
@@ -232,20 +266,21 @@ public class AlcatrazClient implements MoveListener, Runnable{
     /**
      * @param args Command line args
      */
-    public static void main(String[] args) throws MalformedURLException, java.net.UnknownHostException{
-        
+    public static void main(String[] args) throws MalformedURLException, java.net.UnknownHostException, AlreadyBoundException, RemoteException{
         String [] ServerList;
         ServerList = new String[3];
-        ServerList[0]="rmi://192.168.0.100:1099/Server0";
-        ServerList[1]="rmi://192.168.0.101:1099/Server1";
-        ServerList[2]="rmi://192.168.0.102:1099/Server2";
-
+        ServerList[0]="rmi://192.168.0.100:1099/machine0";
+        ServerList[1]="rmi://192.168.0.101:1099/machine1";
+        ServerList[2]="rmi://192.168.0.102:1099/machine2";
+        InetAddress IPaddress = InetAddress.getLocalHost(); 
+        String hostIP = IPaddress.getHostAddress();
         
         String primaryRMI=null;
 
         
-        
         AlcatrazClient client = new AlcatrazClient();
+     
+
         System.out.println("Please enter your username: ");
         Scanner usernamescan = new Scanner(System.in);
         client.username = usernamescan.next();
@@ -253,7 +288,10 @@ public class AlcatrazClient implements MoveListener, Runnable{
         Scanner numPlayerscan = new Scanner(System.in);
         client.numPlayer = numPlayerscan.nextInt();
         
-        
+        String ownRMI="rmi://" + hostIP + ":" + randomPort + "/" + client.username;
+
+        Registry registry = LocateRegistry.createRegistry(randomPort);
+        registry.bind (client.username, client);
                 
                 
         if(args.length>0){
@@ -324,15 +362,17 @@ public class AlcatrazClient implements MoveListener, Runnable{
         }
         return false;
     } 
-    private int regToGame() throws java.net.UnknownHostException{
-        int randomPort = (int)(Math.random() * 1000) + 1090;
+    private int regToGame() throws java.net.UnknownHostException, AlreadyBoundException{
+    
+           InetAddress address2 = InetAddress.getLocalHost(); 
+        String hostIP2 = address2.getHostAddress();
         
         try{
-           InetAddress address = InetAddress.getLocalHost(); 
-           String hostIP = address.getHostAddress() ;    //ermittelt IP Adresse von Spieler 
+
            clientRMI.RMIPort = randomPort;
-           clientRMI.RMIString = "rmi://"+hostIP + ":"+ randomPort +"/" + this.username;
-           
+           clientRMI.RMIString = "rmi://"+ hostIP2 + ":"+ randomPort +"/" + this.username;
+           //Naming.rebind(clientRMI.RMIString, this);
+
            System.out.println(clientRMI.RMIPort);
            
                     
@@ -361,14 +401,15 @@ public class AlcatrazClient implements MoveListener, Runnable{
         }
         return 0;
     } 
+    
     void startGame(int playerCount, int position){
        
-       AlcatrazClient sub1 = new AlcatrazClient();
+      
        
-        
+       
        String[] clientNames = new String[clients.size()];
        String[] clientRMIS = new String[clients.size()];
-       
+     //  AlcatrazClient sub1 = new AlcatrazClient();
        int index = 0;
        for (Map.Entry<String, String> mapEntry : clients.entrySet()){
            clientNames[index]= mapEntry.getKey();
@@ -384,7 +425,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
        System.out.println("Own Position: " + ownPosition);
            }
            
-           sub1.rmi[i] = clientRMIS[i];
+           rmi[i] = clientRMIS[i];
            
            System.out.println("Player " + clientNames[i] + " via " + rmi[i]);
            
@@ -400,21 +441,21 @@ public class AlcatrazClient implements MoveListener, Runnable{
         
        //Logik für Spielstart
        Alcatraz alca = new Alcatraz();
-       sub1.setNumPlayer(numPlayer); 
-       
+       this.setNumPlayer(numPlayer); 
+
        alca.init(numPlayer,ownPosition);   //hier meine Nummer eintragen
        alca.getPlayer(ownPosition).setName(username);
        for(int i=0;i<numPlayer;i++){
           alca.getPlayer(i).setName(clientNames[i]);
           
           if(i!=ownPosition){
-             sub1.setOther(i, alca);             
+             this.setOther(i, alca);             
           }
        System.out.println("Spieler " + (i+1) + ": " + clientNames[i] + ", Position: " + i);
        }
 
        alca.showWindow();
-       alca.addMoveListener(sub1);    
+       alca.addMoveListener(this);    
        alca.start();
        
     }
