@@ -127,7 +127,7 @@ public class ServerState implements Cloneable, Serializable {
             public boolean isQueueReadyToPlay(){
                 for(int i=0; i<3; i++){
                     //if queue is full
-                    if(this.queue[i].size() >= i+2){
+                    if(this.queue[i].size() >= i+1){
                         return true;
                     }
                 }

@@ -88,7 +88,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
 
     @Override
     public void moveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) {
-        this.alca.doMove(player, prisoner, rowOrCol, row, col);
+        //this.alca.doMove(player, prisoner, rowOrCol, row, col);
         this.gamestep++;
         this.clientRMI.drawbuf.add(new GameDraw(gamestep, player, prisoner, rowOrCol, row, col));
         int i=0;
@@ -296,16 +296,16 @@ public class AlcatrazClient implements MoveListener, Runnable{
         }
     }
     public void drawBufWatcher(){
-        int size = this.clientRMI.drawbuf.size();
+        int gamestep = this.gamestep;//this.clientRMI.drawbuf.size();
         try{
             while(true){
-                if(size != this.clientRMI.drawbuf.size()){
+                if(gamestep != this.clientRMI.drawbuf.size()){
                     this.alca.doMove(this.clientRMI.drawbuf.getLast().getPlayer(), 
                             this.clientRMI.drawbuf.getLast().getPrisoner(), 
                             this.clientRMI.drawbuf.getLast().getRowOrCol(), 
                             this.clientRMI.drawbuf.getLast().getRow(), 
                             this.clientRMI.drawbuf.getLast().getCol());
-                    size = this.clientRMI.drawbuf.size();
+                    gamestep = this.gamestep;//this.clientRMI.drawbuf.size();
                     Thread.sleep(300);
                 }
             }
