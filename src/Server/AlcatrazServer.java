@@ -88,7 +88,7 @@ public class AlcatrazServer implements Serializable, Remote{
             return;
         }
         Thread stateWatcher = new Thread(s.queueupdater);
-        stateWatcher.run();
+        stateWatcher.start();
         System.out.println("Server up and running");
         
         Scanner sc = new Scanner(System.in);

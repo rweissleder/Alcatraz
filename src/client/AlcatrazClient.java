@@ -36,16 +36,16 @@ import org.ini4j.Wini;
  * A test class initializing a local Alcatraz game -- illustrating how
  * to use the Alcatraz API.
  */
-public class AlcatrazClient implements MoveListener{
+public class AlcatrazClient implements MoveListener, Serializable{
     private HashMap<String, String> opts;
     private HashMap<String, ServerState.ClientRMIPos> clients;
     private RMIClientImpl clientRMI;
     private IAlcatrazServer regserver;
     private Alcatraz alca;
     private InputScanner scanner;
-    private DrawBufWatcher drawbufwatcher;
+    //private DrawBufWatcher drawbufwatcher;
     
-    private String username = "playerD";
+    private String username = "playerDD";
     
     //total amount of players
     private int numPlayer = 2;
@@ -53,18 +53,18 @@ public class AlcatrazClient implements MoveListener{
     
     private int gamestep = 0;
     
-    private Thread watcher;
+    //private Thread watcher;
     
     public AlcatrazClient(){
-        drawbufwatcher = new DrawBufWatcher();
-        watcher = new Thread();
+        //drawbufwatcher = new DrawBufWatcher();
+        //watcher = new Thread();
         clientRMI = new RMIClientImpl();
         servers = new LinkedList<>();
         servers.add(new RegServerParams());
         scanner = new InputScanner();
     }
     
-    private class RegServerParams{
+    private class RegServerParams implements Serializable{
         private String regservername = "RegServer";
         private String regserverip = "127.0.0.1";
         private int regserverport = 11010;
@@ -198,8 +198,8 @@ public class AlcatrazClient implements MoveListener{
             }
             t.stop();
             client.startGame();
-            client.watcher = new Thread(client.drawbufwatcher);
-            client.watcher.start();
+            //client.watcher = new Thread(client.drawbufwatcher);
+            //client.watcher.start();
         } catch (InterruptedException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
             try {
@@ -276,7 +276,7 @@ public class AlcatrazClient implements MoveListener{
         this.numPlayer = ini.get("client", "playercount", int.class);
     }
     
-    private class InputScanner implements Runnable{
+    private class InputScanner implements Runnable, Serializable{
         
         @Override
         public void run() {
@@ -301,28 +301,54 @@ public class AlcatrazClient implements MoveListener{
         }
     }
     
-    private class DrawBufWatcher implements Runnable{
-        public void drawBufWatcher(){
-            int gamestep_t = gamestep;//this.clientRMI.drawbuf.size();
-            try{
-                while(true){
-                    if(gamestep_t != clientRMI.drawbuf.size()){
-                        alca.doMove(clientRMI.drawbuf.getLast().getPlayer(), 
-                                clientRMI.drawbuf.getLast().getPrisoner(), 
-                                clientRMI.drawbuf.getLast().getRowOrCol(), 
-                                clientRMI.drawbuf.getLast().getRow(), 
-                                clientRMI.drawbuf.getLast().getCol());
-                        gamestep_t = gamestep;//this.clientRMI.drawbuf.size();
-                        Thread.sleep(300);
-                    }
-                }
-            }catch(InterruptedException e){
-                return;
-            }
+//    private class DrawBufWatcher implements Runnable{
+//        public void drawBufWatcher(){
+//            int gamestep_t = gamestep;//this.clientRMI.drawbuf.size();
+//            try{
+//                while(true){
+//                    if(gamestep_t != clientRMI.drawbuf.size()){
+//                        alca.doMove(clientRMI.drawbuf.getLast().getPlayer(), 
+//                                clientRMI.drawbuf.getLast().getPrisoner(), 
+//                                clientRMI.drawbuf.getLast().getRowOrCol(), 
+//                                clientRMI.drawbuf.getLast().getRow(), 
+//                                clientRMI.drawbuf.getLast().getCol());
+//                        gamestep_t = gamestep;//this.clientRMI.drawbuf.size();
+//                        Thread.sleep(300);
+//                    }
+//                }
+//            }catch(InterruptedException e){
+//                return;
+//            }
+//        }
+//        @Override
+//        public void run(){
+//            this.drawBufWatcher();
+//        }
+//    }
+    private class RMIClientImpl implements IRMIClient, Serializable{
+    //Alcatraz myalca;
+    
+    public LinkedList<GameDraw> drawbuf = new LinkedList<>();
+        String RMIString;
+        int RMIPort;
+    
+    
+    @Override
+    public int performMove(Player player, Prisoner prisoner, int rowOrCol, int row, int col, int gamestep) throws RemoteException { 
+        if(this.drawbuf.size() < gamestep-1){
+            return gamestep;
         }
-        @Override
-        public void run(){
-            this.drawBufWatcher();
-        }
+        drawbuf.add(new GameDraw(gamestep, player, prisoner, rowOrCol, row, col));
+        alca.doMove(player, prisoner, rowOrCol, row, col);
+        //myalca.doMove(player, prisoner, rowOrCol, row, col);
+        return this.drawbuf.size();
     }
+    
+    
+    @Override
+    public void gameEnded(Player player) throws RemoteException {
+        //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
+    }
+    
+}
 }
