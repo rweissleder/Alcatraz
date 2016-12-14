@@ -36,7 +36,7 @@ import org.ini4j.Wini;
  * A test class initializing a local Alcatraz game -- illustrating how
  * to use the Alcatraz API.
  */
-public class AlcatrazClient implements MoveListener, Serializable{
+public class AlcatrazClient implements MoveListener, Serializable, Remote{
     private HashMap<String, String> opts;
     private HashMap<String, ServerState.ClientRMIPos> clients;
     private RMIClientImpl clientRMI;
@@ -44,8 +44,8 @@ public class AlcatrazClient implements MoveListener, Serializable{
     private Alcatraz alca;
     private InputScanner scanner;
     //private DrawBufWatcher drawbufwatcher;
-    
-    private String username = "playerDD";
+    Registry registry;
+    private String username = "playerD";
     
     //total amount of players
     private int numPlayer = 2;
@@ -62,6 +62,11 @@ public class AlcatrazClient implements MoveListener, Serializable{
         servers = new LinkedList<>();
         servers.add(new RegServerParams());
         scanner = new InputScanner();
+        try {
+            registry = LocateRegistry.getRegistry();
+        } catch (RemoteException ex) {
+            Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
+        }
     }
     
     private class RegServerParams implements Serializable{
@@ -88,6 +93,7 @@ public class AlcatrazClient implements MoveListener, Serializable{
     @Override
     public void moveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) {
         //this.alca.doMove(player, prisoner, rowOrCol, row, col);
+        this.alca.doMove(player, prisoner, rowOrCol, row, col);
         this.gamestep++;
         this.clientRMI.drawbuf.add(new GameDraw(gamestep, player, prisoner, rowOrCol, row, col));
         int i=0;
@@ -99,7 +105,7 @@ public class AlcatrazClient implements MoveListener, Serializable{
             ClientRMIPos r = (ClientRMIPos)entry.getValue();
             try {
                 // last saved draw of remote client 
-                i = r.getRMI().performMove(player, prisoner, rowOrCol, row, col, this.gamestep);
+                i = ((RMIClientImpl)registry.lookup(entry.getKey())).performMove(player, prisoner, rowOrCol, row, col, this.gamestep);
                 if(i<this.gamestep){
                     while(i<this.gamestep){
                         i++;
@@ -115,6 +121,8 @@ public class AlcatrazClient implements MoveListener, Serializable{
                 Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
                 i=0;
                 continue;
+            } catch (NotBoundException ex) {
+                Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
             }
             i=0;
         }
@@ -158,10 +166,20 @@ public class AlcatrazClient implements MoveListener, Serializable{
                 Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
+        
         InetAddress address; 
         Thread t = new Thread(client.scanner);
         t.start();
-        Registry registry;
+        
+        RMIClientImpl stub;
+        try {
+           // stub = (RMIClientImpl) UnicastRemoteObject.exportObject(client.clientRMI, 0);
+            
+            // Bind the remote object's stub in the registry
+            client.registry.bind(client.username, client.clientRMI);
+        } catch (RemoteException | AlreadyBoundException ex) {
+            Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
+        }
         
         if(!client.connectToServer(ServerList)){
             System.out.println("No servers available.");
@@ -218,8 +236,11 @@ public class AlcatrazClient implements MoveListener, Serializable{
                 registry = LocateRegistry.getRegistry("rmi://" + ServerList[i] + ":1099");
                 this.setRegServer((IAlcatrazServer) Naming.lookup(ServerList[i]));        
                 System.out.println("RMI OK");
+                
+                
                 System.out.println("Verbunden mit Server " + ServerList[i]);
                 primaryRMI=ServerList[i];
+                
                 return true;
             }
             catch(Exception e){
@@ -301,37 +322,15 @@ public class AlcatrazClient implements MoveListener, Serializable{
         }
     }
     
-//    private class DrawBufWatcher implements Runnable{
-//        public void drawBufWatcher(){
-//            int gamestep_t = gamestep;//this.clientRMI.drawbuf.size();
-//            try{
-//                while(true){
-//                    if(gamestep_t != clientRMI.drawbuf.size()){
-//                        alca.doMove(clientRMI.drawbuf.getLast().getPlayer(), 
-//                                clientRMI.drawbuf.getLast().getPrisoner(), 
-//                                clientRMI.drawbuf.getLast().getRowOrCol(), 
-//                                clientRMI.drawbuf.getLast().getRow(), 
-//                                clientRMI.drawbuf.getLast().getCol());
-//                        gamestep_t = gamestep;//this.clientRMI.drawbuf.size();
-//                        Thread.sleep(300);
-//                    }
-//                }
-//            }catch(InterruptedException e){
-//                return;
-//            }
-//        }
-//        @Override
-//        public void run(){
-//            this.drawBufWatcher();
-//        }
-//    }
+
     private class RMIClientImpl implements IRMIClient, Serializable{
     //Alcatraz myalca;
     
     public LinkedList<GameDraw> drawbuf = new LinkedList<>();
-        String RMIString;
-        int RMIPort;
-    
+
+    public RMIClientImpl(){
+        super();
+    }
     
     @Override
     public int performMove(Player player, Prisoner prisoner, int rowOrCol, int row, int col, int gamestep) throws RemoteException { 
