@@ -62,8 +62,9 @@ public class AlcatrazServerImpl extends UnicastRemoteObject implements IAlcatraz
             return 0;
         }
 
-        public boolean isTeamReady(String name) throws RemoteException {
-            return state.ifReadyToPlay(name);
+        @Override
+        public HashMap<String, ServerState.ClientRMIPos> isTeamReady(String name) throws RemoteException {
+            return state.getPlayers(name);
         }
         
         /**
@@ -73,13 +74,12 @@ public class AlcatrazServerImpl extends UnicastRemoteObject implements IAlcatraz
          * @return
          * @throws RemoteException
          */
-        public HashMap<String, ServerState.ClientRMIPos> start(String name) throws RemoteException {
-            HashMap<String, ServerState.ClientRMIPos> res = state.getPlayers(name);
-            //TODO
-            //this.playersInPlay.add(name);
-            //backup
-            
-            return res;
+        public boolean start(String name) throws RemoteException {
+            //player requested game start - delete from queue
+            if(!state.ifReadyToPlay(name))
+                return false;
+            state.deletePlayer(name);
+            return false;
         }
         
     }

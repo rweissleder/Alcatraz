@@ -90,7 +90,7 @@ public class ServerState implements Cloneable, Serializable {
             };
             
             public HashMap<String, ClientRMIPos> getPlayers(String name){
-                if(!this.ifReadyToPlay(name)){
+                if(!this.ifExists(name)){
                     return null;
                 }
                 int playerqueue = regNames.get(name);

@@ -140,7 +140,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
         
         String [] ServerList;
         ServerList = new String[1];
-        ServerList[0]="rmi://192.168.245.185:1099/Server2";
+        ServerList[0]="rmi://192.168.242.139:1099/Server2";
         //ServerList[0]="rmi://192.168.0.102:1099/Server2";
 //        ServerList[1]="rmi://192.168.0.101:1099/Server1";
 //        ServerList[2]="rmi://192.168.0.102:1099/Server2";
@@ -178,9 +178,10 @@ public class AlcatrazClient implements MoveListener, Runnable{
             }
             while(t.isAlive()){
                 try{
-                    while(!client.regserver.isTeamReady(client.username)){
+                    do{
                         Thread.sleep(300);
-                    }
+                        client.clients = client.regserver.isTeamReady(client.username);
+                    }while(client.clients.size() != client.numPlayer);
                     break;
                 }catch(RemoteException e){
                     System.out.println("Primary is unreachable. Reconecting to backup(s).");
@@ -191,14 +192,19 @@ public class AlcatrazClient implements MoveListener, Runnable{
                     continue;
                 }
             }
-            if(client.receivePlayersInterfaces() < 0){
-                System.out.println("Error by game start");
-                System.exit(1);
+            while(!client.requestStart()){
+                //System.out.println("Error by game start");
+                Thread.sleep(100);
             }
             t.stop();
             client.startGame();
         } catch (InterruptedException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
+            try {
+                client.regserver.unregister(client.username);
+            } catch (RemoteException ex1) {
+                Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex1);
+            }
         }
     }
     private boolean connectToServer(String[] ServerList){
@@ -238,14 +244,13 @@ public class AlcatrazClient implements MoveListener, Runnable{
         }
         return 0;
     }
-    private int receivePlayersInterfaces(){
+    private boolean requestStart(){
         try {
-            this.clients = new HashMap<>(this.regserver.start(this.username));
+            return this.regserver.start(this.username);
         } catch (RemoteException | NullPointerException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
-            return -1;
+            return false;
         }
-        return 0;
     } 
     
     void startGame(){
