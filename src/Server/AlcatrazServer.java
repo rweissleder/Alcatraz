@@ -39,7 +39,7 @@ import spread.*;
  *
  * @author Florian
  */
-public class AlcatrazServer implements Serializable, Remote, Runnable {
+public class AlcatrazServer implements Serializable, Remote{
 
     public String _serverHost;
     public int _spreadPort = 13335;
@@ -63,10 +63,6 @@ public class AlcatrazServer implements Serializable, Remote, Runnable {
         return server.spread._serverName;
     }
     
-    @Override
-    public void run(){
-        queueupdater.onGameStart();
-    }
 
     public static void main(String args[]) throws IOException, SpreadException {
         AlcatrazServer s = new AlcatrazServer();
@@ -91,8 +87,8 @@ public class AlcatrazServer implements Serializable, Remote, Runnable {
             System.out.println("Server could not be initialized");
             return;
         }
-        Thread stateWatcher = new Thread(s);
-        stateWatcher.start();
+        Thread stateWatcher = new Thread(s.queueupdater);
+        stateWatcher.run();
         System.out.println("Server up and running");
         
         Scanner sc = new Scanner(System.in);
@@ -272,8 +268,8 @@ public class AlcatrazServer implements Serializable, Remote, Runnable {
 
     }
 
-    private class QueueUpdated{
-        private void onGameStart(){
+    private class QueueUpdated implements Runnable{
+        public void run(){
             while(true){
                 try {
                     Thread.sleep(200);

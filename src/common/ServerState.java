@@ -138,7 +138,7 @@ public class ServerState implements Cloneable, Serializable {
                 LinkedList<String> list = new LinkedList<>();
                 for(int i=0; i<3; i++){
                     //if queue is full
-                    if(this.queue[i].size() >= i+2){
+                    if(this.queue[i].size() >= i+1){
                         list.addAll(this.queue[i].keySet());
                     }
                 }

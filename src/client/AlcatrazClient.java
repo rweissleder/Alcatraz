@@ -28,6 +28,7 @@ import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.Set;
 import org.ini4j.Wini;
 
 
@@ -43,7 +44,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
     private Alcatraz alca;
     private InputScanner scanner;
     
-    private String username = "playerDD";
+    private String username = "playerD";
     
     //total amount of players
     private int numPlayer = 2;
@@ -257,6 +258,10 @@ public class AlcatrazClient implements MoveListener, Runnable{
     void startGame(){
         this.alca = new Alcatraz();
         this.alca.init(numPlayer, this.clients.get(this.username).getPos());
+        LinkedList<String> names = new LinkedList<>(this.clients.keySet());
+        for(int i=0; i<this.clients.size(); i++){
+            this.alca.getPlayer(i).setName(names.get(i));
+        }
         Iterator it = this.clients.entrySet().iterator();
         this.alca.showWindow();
         this.alca.addMoveListener(this);
