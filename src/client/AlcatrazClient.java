@@ -36,13 +36,14 @@ import org.ini4j.Wini;
  * A test class initializing a local Alcatraz game -- illustrating how
  * to use the Alcatraz API.
  */
-public class AlcatrazClient implements MoveListener, Runnable{
+public class AlcatrazClient implements MoveListener{
     private HashMap<String, String> opts;
     private HashMap<String, ServerState.ClientRMIPos> clients;
     private RMIClientImpl clientRMI;
     private IAlcatrazServer regserver;
     private Alcatraz alca;
     private InputScanner scanner;
+    private DrawBufWatcher drawbufwatcher;
     
     private String username = "playerD";
     
@@ -55,17 +56,14 @@ public class AlcatrazClient implements MoveListener, Runnable{
     private Thread watcher;
     
     public AlcatrazClient(){
-        
+        drawbufwatcher = new DrawBufWatcher();
+        watcher = new Thread();
         clientRMI = new RMIClientImpl();
         servers = new LinkedList<>();
         servers.add(new RegServerParams());
         scanner = new InputScanner();
     }
     
-    @Override
-    public void run(){
-       drawBufWatcher(); 
-    }
     private class RegServerParams{
         private String regservername = "RegServer";
         private String regserverip = "127.0.0.1";
@@ -200,6 +198,8 @@ public class AlcatrazClient implements MoveListener, Runnable{
             }
             t.stop();
             client.startGame();
+            client.watcher = new Thread(client.drawbufwatcher);
+            client.watcher.start();
         } catch (InterruptedException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
             try {
@@ -246,6 +246,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
         }
         return 0;
     }
+    
     private boolean requestStart(){
         try {
             return this.regserver.start(this.username);
@@ -265,8 +266,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
         Iterator it = this.clients.entrySet().iterator();
         this.alca.showWindow();
         this.alca.addMoveListener(this);
-        watcher = new Thread(this);
-        watcher.start();
+        
         this.alca.start();
     }
     
@@ -300,22 +300,29 @@ public class AlcatrazClient implements MoveListener, Runnable{
             }
         }
     }
-    public void drawBufWatcher(){
-        int gamestep = this.gamestep;//this.clientRMI.drawbuf.size();
-        try{
-            while(true){
-                if(gamestep != this.clientRMI.drawbuf.size()){
-                    this.alca.doMove(this.clientRMI.drawbuf.getLast().getPlayer(), 
-                            this.clientRMI.drawbuf.getLast().getPrisoner(), 
-                            this.clientRMI.drawbuf.getLast().getRowOrCol(), 
-                            this.clientRMI.drawbuf.getLast().getRow(), 
-                            this.clientRMI.drawbuf.getLast().getCol());
-                    gamestep = this.gamestep;//this.clientRMI.drawbuf.size();
-                    Thread.sleep(300);
+    
+    private class DrawBufWatcher implements Runnable{
+        public void drawBufWatcher(){
+            int gamestep_t = gamestep;//this.clientRMI.drawbuf.size();
+            try{
+                while(true){
+                    if(gamestep_t != clientRMI.drawbuf.size()){
+                        alca.doMove(clientRMI.drawbuf.getLast().getPlayer(), 
+                                clientRMI.drawbuf.getLast().getPrisoner(), 
+                                clientRMI.drawbuf.getLast().getRowOrCol(), 
+                                clientRMI.drawbuf.getLast().getRow(), 
+                                clientRMI.drawbuf.getLast().getCol());
+                        gamestep_t = gamestep;//this.clientRMI.drawbuf.size();
+                        Thread.sleep(300);
+                    }
                 }
+            }catch(InterruptedException e){
+                return;
             }
-        }catch(InterruptedException e){
-            return;
+        }
+        @Override
+        public void run(){
+            this.drawBufWatcher();
         }
     }
 }
