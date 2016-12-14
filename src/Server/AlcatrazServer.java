@@ -25,6 +25,7 @@ import java.rmi.server.UnicastRemoteObject;
 import java.util.AbstractMap;
 import java.util.Arrays;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -47,7 +48,8 @@ public class AlcatrazServer implements Serializable, Remote {
     public AlcatrazServerImpl server;
     //public boolean primary;
     LinkedList<IRMIClient> buf;
-    //SpreadConnection connection; 
+    //SpreadConnection connection;
+    private QueueUpdated queueupdater;
     
     public AlcatrazServer(){
     //  server.state = new ServerState();
@@ -57,9 +59,13 @@ public class AlcatrazServer implements Serializable, Remote {
         ServerSpread spreadserver = new ServerSpread();
         server = new AlcatrazServerImpl(spreadserver);
         server.spread.init(server.state);
+        queueupdater = new QueueUpdated();
         return server.spread._serverName;
     }
     
+    public void run(){
+        queueupdater.onGameStart();
+    }
 
     public static void main(String args[]) throws IOException, SpreadException {
         AlcatrazServer s = new AlcatrazServer();
@@ -85,6 +91,7 @@ public class AlcatrazServer implements Serializable, Remote {
             return;
         }
         System.out.println("Server up and running");
+        
         Scanner sc = new Scanner(System.in);
         while (sc.hasNext()) {
             if ("exit".equals(sc.next())) {
@@ -258,9 +265,27 @@ public class AlcatrazServer implements Serializable, Remote {
                 //not used
             }
 
-
+            
 
     }
 
-    
+    private class QueueUpdated{
+        private void onGameStart(){
+            while(true){
+                try {
+                    Thread.sleep(200);
+                } catch (InterruptedException ex) {
+                    Logger.getLogger(AlcatrazServer.class.getName()).log(Level.SEVERE, null, ex);
+                    return;
+                }
+                if(server.state.isQueueReadyToPlay()){
+                    LinkedList<String> list = server.state.getPlayersInGame();
+                    Iterator it = list.iterator();
+                    while(it.hasNext()){
+                        server.state.deletePlayer((String)it.next());
+                    }
+                }
+            }
+        }
+    }
 }

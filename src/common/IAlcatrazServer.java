@@ -20,7 +20,7 @@ public interface IAlcatrazServer extends Remote{
     
     public enum SRESPONSE {OK, EXIT};
     
-    public LinkedList<String> register(IRMIClient p, String name, int playercount, String RMIString) throws RemoteException;
+    public LinkedList<String> register(IRMIClient p, String name, int playercount) throws RemoteException;
     public int unregister(String name) throws RemoteException;
     /**
      * Shows to server that a IRMIClient is "still there", that said it is still waiting for game start.

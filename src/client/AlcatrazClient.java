@@ -88,6 +88,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
 
     @Override
     public void moveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) {
+        this.alca.doMove(player, prisoner, rowOrCol, row, col);
         this.gamestep++;
         this.clientRMI.drawbuf.add(new GameDraw(gamestep, player, prisoner, rowOrCol, row, col));
         int i=0;
@@ -229,7 +230,7 @@ public class AlcatrazClient implements MoveListener, Runnable{
     } 
     private int regToGame(){
         try{
-            LinkedList<String> playernames = regserver.register(clientRMI, username, numPlayer,"");
+            LinkedList<String> playernames = regserver.register(clientRMI, username, numPlayer);
             if(playernames.size() > 0){
                 System.out.println("List of other players already waiting:");
                 System.out.print(playernames);

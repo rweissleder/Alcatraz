@@ -18,7 +18,7 @@ public class AlcatrazServerImpl extends UnicastRemoteObject implements IAlcatraz
         
         public final AlcatrazServer.ServerSpread spread;
         protected ServerState state;
-        private LinkedList<String> playersInPlay;//to state
+        //to state
         
         
         public AlcatrazServerImpl(AlcatrazServer.ServerSpread s) throws RemoteException {
@@ -31,21 +31,21 @@ public class AlcatrazServerImpl extends UnicastRemoteObject implements IAlcatraz
         
         
         @Override
-        public LinkedList<String> register(IRMIClient p, String name,int playercount, String RMIString) throws RemoteException {
+        public LinkedList<String> register(IRMIClient p, String name,int playercount) throws RemoteException {
             
-            if(!state.addPlayer(p, name, playercount, RMIString)){
+            if(!state.addPlayer(p, name, playercount)){
                 Logger.getLogger(AlcatrazServer.class.getName()).log(Level.WARNING, "Player already registered");
                 return null;
             }
             
-            System.out.println("Player " + name + " joined (via " + RMIString + ") and wants to play a " + playercount + " - player game");
+            System.out.println("Player " + name + " joined and wants to play a " + playercount + " - player game");
             System.out.println("");
             try {
                 this.spread.sendBackup();
             } catch (SpreadException ex) {
                 Logger.getLogger(AlcatrazServerImpl.class.getName()).log(Level.SEVERE, null, ex);
             }
-            return state.getOtherPlayersNames(name, playercount, RMIString);
+            return state.getOtherPlayersNames(name, playercount);
         }
 
         @Override
@@ -74,12 +74,13 @@ public class AlcatrazServerImpl extends UnicastRemoteObject implements IAlcatraz
          * @return
          * @throws RemoteException
          */
+        @Override
         public boolean start(String name) throws RemoteException {
             //player requested game start - delete from queue
             if(!state.ifReadyToPlay(name))
                 return false;
-            state.deletePlayer(name);
-            return false;
+            state.playerPutInPlay(name);
+            return true;
         }
         
     }

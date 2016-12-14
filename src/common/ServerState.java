@@ -32,43 +32,40 @@ public class ServerState implements Cloneable, Serializable {
         }
     }
             int generation; // # of state
-            HashMap<String, String> RMIStrings;
             HashMap<String, ClientRMIPos> queue[]; // array of queues by amount of players to play with 
             HashMap<String, Integer> regNames; // names of players and amount of other players with which they want to play
+            private LinkedList<String> playersInPlay;
             public ServerState getState(){
                 return new ServerState(this);
             }
             
             public ServerState(){
+                playersInPlay = new LinkedList<String>();
                 queue = new HashMap[3];
-                queue[0] = new HashMap<>();
-                queue[1] = new HashMap<>();
-                queue[2] = new HashMap<>();
+                queue[0] = new HashMap<>(); //2 players
+                queue[1] = new HashMap<>(); //3
+                queue[2] = new HashMap<>(); //4
                 regNames = new HashMap<>();
                 generation = 0;  //Versionsnr
-                RMIStrings = new HashMap<>();
             }
             
 
-            public ServerState(HashMap<String, Integer> names, HashMap<String, ClientRMIPos>[] queue, HashMap<String, String> RMIStrings){
+            public ServerState(HashMap<String, Integer> names, HashMap<String, ClientRMIPos>[] queue){
                 this.queue = queue.clone();
                 regNames = names;
-                generation = 0;
-                this.RMIStrings = RMIStrings;
-                
+                generation = 0; 
             }
             
             public ServerState(ServerState state){
                 this.queue = state.queue;
                 this.regNames = state.regNames;
                 this.generation = state.generation;
-                this.RMIStrings = state.RMIStrings;
             }
             
             public boolean ifExists(String name){
                 return regNames.containsKey(name);
             }
-            public boolean addPlayer(IRMIClient p, String name,int playercount, String RMIString){
+            public boolean addPlayer(IRMIClient p, String name,int playercount){
                 if (ifExists(name)) {
                     return false;
                 }
@@ -76,6 +73,7 @@ public class ServerState implements Cloneable, Serializable {
                 queue[playercount-1].put(name, new ClientRMIPos(p, queue[playercount-1].size()));
                 regNames.put(name, playercount - 1);
                 generation++;
+                System.out.println("Player " + name + " added.");
                 return true;
             };
             
@@ -86,6 +84,7 @@ public class ServerState implements Cloneable, Serializable {
                 queue[regNames.get(name)].remove(name);
                 regNames.remove(name);
                 generation++;
+                System.out.println("Player " + name + " deleted.");
                 return true;
             };
             
@@ -108,7 +107,7 @@ public class ServerState implements Cloneable, Serializable {
                 return res;
             };
             
-            public LinkedList<String> getOtherPlayersNames(String name, int playercount, String RMIString){
+            public LinkedList<String> getOtherPlayersNames(String name, int playercount){
                 LinkedList<String> list = new LinkedList<>(queue[playercount-1].keySet());
                 list.remove(name);
                 return list;
@@ -121,6 +120,30 @@ public class ServerState implements Cloneable, Serializable {
                 return queue[regNames.get(name)].size() >= regNames.get(name)+1;
             }
             
+            public void playerPutInPlay(String name){
+                this.playersInPlay.add(name);
+            }
+            //search for at least 1 queue that is full
+            public boolean isQueueReadyToPlay(){
+                for(int i=0; i<3; i++){
+                    //if queue is full
+                    if(this.queue[i].size() >= i+2){
+                        return true;
+                    }
+                }
+                return false;
+            }
+            
+            public LinkedList<String> getPlayersInGame(){
+                LinkedList<String> list = new LinkedList<>();
+                for(int i=0; i<3; i++){
+                    //if queue is full
+                    if(this.queue[i].size() >= i+2){
+                        list.addAll(this.queue[i].keySet());
+                    }
+                }
+                return list;
+            }
             public int getGeneration(){
                 return generation;
             }
