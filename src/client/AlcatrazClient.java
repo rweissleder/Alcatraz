@@ -45,16 +45,16 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
     private InputScanner scanner;
     //private DrawBufWatcher drawbufwatcher;
     Registry registry;
-    private String username = "playerD";
-    
+    private String username = "playerDD";
+
     //total amount of players
     private int numPlayer = 2;
-    private int port = 11001;
-    
+    private int port = 11101;
+
     private int gamestep = 0;
-    
+
     //private Thread watcher;
-    
+
     public AlcatrazClient() throws RemoteException{
         //drawbufwatcher = new DrawBufWatcher();
         //watcher = new Thread();
@@ -63,25 +63,25 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
         servers.add(new RegServerParams());
         scanner = new InputScanner();
         try {
-            registry = LocateRegistry.getRegistry();
+            registry = LocateRegistry.createRegistry(11011);
         } catch (RemoteException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
         }
     }
-    
+
     private class RegServerParams implements Serializable{
         private String regservername = "RegServer";
         private String regserverip = "127.0.0.1";
         private int regserverport = 11010;
     }
-    
+
     LinkedList<RegServerParams> servers;
-    
+
 
     public void setRegServer(IAlcatrazServer server){
         this.regserver = server;
     }
-    
+
     public int getNumPlayer() {
         return numPlayer;
     }
@@ -104,18 +104,18 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
                 continue;
             ClientRMIPos r = (ClientRMIPos)entry.getValue();
             try {
-                // last saved draw of remote client 
+                // last saved draw of remote client
                 i = ((RMIClientImpl)registry.lookup(entry.getKey())).performMove(player, prisoner, rowOrCol, row, col, this.gamestep);
                 if(i<this.gamestep){
                     while(i<this.gamestep){
                         i++;
-                        i = r.getRMI().performMove(this.clientRMI.drawbuf.get(i).getPlayer(), 
-                                this.clientRMI.drawbuf.get(i).getPrisoner(), 
+                        i = r.getRMI().performMove(this.clientRMI.drawbuf.get(i).getPlayer(),
+                                this.clientRMI.drawbuf.get(i).getPrisoner(),
                                 this.clientRMI.drawbuf.get(i).getRowOrCol(),
-                                this.clientRMI.drawbuf.get(i).getRow(), 
+                                this.clientRMI.drawbuf.get(i).getRow(),
                                 this.clientRMI.drawbuf.get(i).getCol(),
                                 this.clientRMI.drawbuf.get(i).getGamestep());
-                    }        
+                    }
                 }
             } catch (RemoteException ex) {
                 Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
@@ -127,36 +127,36 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
             i=0;
         }
      }
-    
+
     public void gameWon(Player player) {
         System.out.println("Player " + player.getId() + " wins.");
     }
 
     public void setUsername(String username){
-        
+
         this.username=username;
     }
     public String getUsername(){
         return this.username;
     }
-    
- 
+
+
     /**
      * @param args Command line args
      */
     public static void main(String[] args) throws MalformedURLException{
-        
+
         String [] ServerList;
         ServerList = new String[1];
-        ServerList[0]="rmi:// 192.168.244.81/Server2";
+        ServerList[0]="rmi://192.168.244.81:1099/Server2";
         //ServerList[0]="rmi://192.168.0.102:1099/Server2";
 //        ServerList[1]="rmi://192.168.0.101:1099/Server1";
 //        ServerList[2]="rmi://192.168.0.102:1099/Server2";
 
-        
+
         String primaryRMI=null;
 
-        
+
         try{
         AlcatrazClient client = new AlcatrazClient();
         if(args.length>0){
@@ -166,28 +166,28 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
                 Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
             }
         }
-        
-        InetAddress address; 
+
+        InetAddress address;
         Thread t = new Thread(client.scanner);
         t.start();
-        
-        RMIClientImpl stub;
+
+        IRMIClient stub;
         try {
            // stub = (RMIClientImpl) UnicastRemoteObject.exportObject(client.clientRMI, 0);
-            
+            stub = (IRMIClient)UnicastRemoteObject.exportObject(client.clientRMI, client.port);
             // Bind the remote object's stub in the registry
-            Naming.rebind(client.username, client.clientRMI);
+            Naming.rebind(client.username, stub);
             //client.registry.bind(client.username, client.regserver);
         } catch (RemoteException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
         }
-        
+
         if(!client.connectToServer(ServerList)){
             System.out.println("No servers available.");
         }
         try {
             // connecting to rmi registry of primary server
-            
+
 
             int playerswaiting = client.regToGame();
             if(playerswaiting < 0)
@@ -236,16 +236,16 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
         Registry registry;
         String primaryRMI;
         for(int i=0; i<=1; i++){
-            
+
             try{
                 registry = LocateRegistry.getRegistry("rmi://" + ServerList[i] + ":1099");
-                this.setRegServer((IAlcatrazServer) Naming.lookup(ServerList[i]));        
+                this.setRegServer((IAlcatrazServer) Naming.lookup(ServerList[i]));
                 System.out.println("RMI OK");
-                
-                
+
+
                 System.out.println("Verbunden mit Server " + ServerList[i]);
                 primaryRMI=ServerList[i];
-                
+
                 return true;
             }
             catch(Exception e){
@@ -254,7 +254,7 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
             }
         }
         return false;
-    } 
+    }
     private int regToGame(){
         try{
             LinkedList<String> playernames = regserver.register(clientRMI, username, numPlayer);
@@ -272,7 +272,7 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
         }
         return 0;
     }
-    
+
     private boolean requestStart(){
         try {
             return this.regserver.start(this.username);
@@ -280,8 +280,8 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
             return false;
         }
-    } 
-    
+    }
+
     void startGame(){
         this.alca = new Alcatraz();
         this.alca.init(numPlayer, this.clients.get(this.username).getPos());
@@ -292,18 +292,18 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
         Iterator it = this.clients.entrySet().iterator();
         this.alca.showWindow();
         this.alca.addMoveListener(this);
-        
+
         this.alca.start();
     }
-    
+
     public void parseConfigFile(String config) throws IOException{
         Wini ini = new Wini(new File(config));
         this.username = ini.get("client", "name");
         this.numPlayer = ini.get("client", "playercount", int.class);
     }
-    
+
     private class InputScanner implements Runnable, Serializable{
-        
+
         @Override
         public void run() {
             Scanner scn = new Scanner(System.in);
@@ -326,19 +326,19 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
             }
         }
     }
-    
+
 
     private class RMIClientImpl implements IRMIClient, Serializable{
     //Alcatraz myalca;
-    
+
     public LinkedList<GameDraw> drawbuf = new LinkedList<>();
 
     public RMIClientImpl(){
         super();
     }
-    
+
     @Override
-    public int performMove(Player player, Prisoner prisoner, int rowOrCol, int row, int col, int gamestep) throws RemoteException { 
+    public int performMove(Player player, Prisoner prisoner, int rowOrCol, int row, int col, int gamestep) throws RemoteException {
         if(this.drawbuf.size() < gamestep-1){
             return gamestep;
         }
@@ -347,12 +347,12 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
         //myalca.doMove(player, prisoner, rowOrCol, row, col);
         return this.drawbuf.size();
     }
-    
-    
+
+
     @Override
     public void gameEnded(Player player) throws RemoteException {
         //throw new UnsupportedOperationException("Not supported yet."); //To change body of generated methods, choose Tools | Templates.
     }
-    
+
 }
 }
