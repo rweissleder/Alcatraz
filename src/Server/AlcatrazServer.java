@@ -237,6 +237,10 @@ public class AlcatrazServer implements Serializable, Remote {
                 if (message.getObject().toString()==null) {
                     System.out.println("...INFO: Empty state received and will be ignored.");
                 }
+                else if (message.getObject().toString().contains("machine")) {
+                    _primaryServer=message.getObject().toString();
+                    System.out.println("New primary: "+_primaryServer);
+                }
                 else if (verify.contains("Who is in the group")) {
                             SpreadMessage msg = new SpreadMessage();
                             msg.setObject("I am in the group");
@@ -328,25 +332,35 @@ public class AlcatrazServer implements Serializable, Remote {
                 if (info.isCausedByLeave()) {
                         System.out.println("member '" + info.getLeft().toString() + "' left the group.");
                         if (info.getLeft().toString().contains(_primaryServer)) {
-                                System.out.println("Primary server disconnected from group. Electing new primary...");
+                            System.out.println("Primary server left group. Electing new primary...");
                                     try {
                                         FileReader fr = new FileReader("src/common/config.txt");
                                         BufferedReader br = new BufferedReader(fr);
-                                        br.readLine();  //Skip this line //Groupname
+                                        allMembers="";
+                                        SpreadMessage msg = new SpreadMessage();
+                                        msg.setObject("Who is in the group");
+                                        msg.addGroup(GroupName);
+                                        msg.setReliable();
+                                        msg.setSelfDiscard(false);
+                                        try {
+                                            con.multicast(msg);
+                                        } catch (SpreadException e) {
+                                            System.err.println("Could not send message...");
+                                        }
+                                        Thread.sleep(1000); br.readLine();  //Skip this line //Groupname
                                         int c = Integer.parseInt(br.readLine()); //Line 2, number of servers
                                         for (int i=0; i<c; i++) {                
                                             br.readLine();  //Skip this line // IP
                                             String nextMachine = br.readLine();
-                                                if (info.getDisconnected().toString().contains(nextMachine)) {
-                                                br.readLine();  //Skip this line // IP
-                                                _primaryServer = br.readLine();
+                                            if (allMembers.contains(nextMachine)) {
+                                                _primaryServer = nextMachine;
                                                 break;
-                                                }
+                                            }
                                         }
                                         System.out.println("New Primary is "+_primaryServer);
                                     }  catch (Exception ex) {
                                         System.out.println(ex);
-                                    }    
+                                    }  
                         }
                 } else if (info.isCausedByDisconnect()) { 
                         System.out.println("member '" + info.getDisconnected().toString() + "' was disconnected from the group.");
@@ -355,12 +369,25 @@ public class AlcatrazServer implements Serializable, Remote {
                                     try {
                                         FileReader fr = new FileReader("src/common/config.txt");
                                         BufferedReader br = new BufferedReader(fr);
-                                        br.readLine();  //Skip this line //Groupname
+                                        allMembers="";
+                                        SpreadMessage msg = new SpreadMessage();
+                                        msg.setObject("Who is in the group");
+                                        msg.addGroup(GroupName);
+                                        msg.setReliable();
+                                        msg.setSelfDiscard(false);
+                                        try {
+                                            con.multicast(msg);
+                                        } catch (SpreadException e) {
+                                            System.err.println("Could not send message...");
+                                        }
+                                        Thread.sleep(1000); br.readLine();  //Skip this line //Groupname
+                                        System.out.println(allMembers);
                                         int c = Integer.parseInt(br.readLine()); //Line 2, number of servers
                                         for (int i=0; i<c; i++) {                
                                             br.readLine();  //Skip this line // IP
                                             String nextMachine = br.readLine();
                                                 if (info.getDisconnected().toString().contains(nextMachine)) {
+                                                    System.out.println(info.getDisconnected().toString()+nextMachine);
                                                 br.readLine();  //Skip this line // IP
                                                 _primaryServer = br.readLine();
                                                 break;
