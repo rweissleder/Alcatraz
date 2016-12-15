@@ -189,7 +189,7 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
                         lookup=false;                    
                         System.out.println("DES GEHT NED" + rmi[k] + attempt +": Trying to reach Player "+k+": "+rmi[k]+": "+ex);
                         attempt++;
-                        Thread.sleep(5000);
+                        Thread.sleep(3000);
                         // Logger.getLogger(Test.class.getName()).log(Level.SEVERE, null, ex);
                       }  
                 }
@@ -204,8 +204,7 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
         //doMove wird für ID des Spielers durchgeführt dessen Zug übergeben wurde
       
         int i = player.getId();
-        other[i].doMove(other[i].getPlayer(player.getId()), other[i].getPrisoner(prisoner.getId()), rowOrCol, row, col);
-        System.out.println("Doing remote Move: i="+i+" "+other[i].getPlayer(player.getId())+" - rowOrCol:"+rowOrCol+" row:"+row+"col:"+col);
+        
         //Jetzt schicke ich Nachrichten-Kopien an Alle außer mich und den Spieler der Move macht        
         //Damit finde ich heraus welche ID ich habe
         int myId = 0;
@@ -223,8 +222,12 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
                 } catch (RemoteException | MalformedURLException | NotBoundException ex) {
            //             Logger.getLogger(Client.class.getName()).log(Level.SEVERE, null, ex);
                 }
+                
             }       
         }
+        
+        other[i].doMove(other[i].getPlayer(player.getId()), other[i].getPrisoner(prisoner.getId()), rowOrCol, row, col);
+        System.out.println("Doing remote Move: i="+i+" "+other[i].getPlayer(player.getId())+" - rowOrCol:"+rowOrCol+" row:"+row+"col:"+col);
     }
     
     //EMPFÄNGT NACHRICHTEN-KOPIE UND FÜHRT MOVE AUS / RELIABILITY
@@ -277,10 +280,12 @@ public class AlcatrazClient extends UnicastRemoteObject implements MoveListener,
      */
     public static void main(String[] args) throws MalformedURLException, java.net.UnknownHostException, AlreadyBoundException, RemoteException{
         String [] ServerList;
-        ServerList = new String[3];
+        ServerList = new String[4];
         ServerList[0]="rmi://192.168.0.100:1099/machine0";
         ServerList[1]="rmi://192.168.0.101:1099/machine1";
         ServerList[2]="rmi://192.168.0.102:1099/machine2";
+        ServerList[3]="rmi://192.168.0.102:1099/machine3";
+
         InetAddress IPaddress = InetAddress.getLocalHost(); 
         String hostIP = IPaddress.getHostAddress();
         
