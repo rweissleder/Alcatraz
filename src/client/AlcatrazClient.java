@@ -36,7 +36,7 @@ import org.ini4j.Wini;
  * A test class initializing a local Alcatraz game -- illustrating how
  * to use the Alcatraz API.
  */
-public class AlcatrazClient implements MoveListener, Serializable, Remote{
+public class AlcatrazClient extends UnicastRemoteObject implements MoveListener, Serializable, Remote{
     private HashMap<String, String> opts;
     private HashMap<String, ServerState.ClientRMIPos> clients;
     private RMIClientImpl clientRMI;
@@ -55,7 +55,7 @@ public class AlcatrazClient implements MoveListener, Serializable, Remote{
     
     //private Thread watcher;
     
-    public AlcatrazClient(){
+    public AlcatrazClient() throws RemoteException{
         //drawbufwatcher = new DrawBufWatcher();
         //watcher = new Thread();
         clientRMI = new RMIClientImpl();
@@ -148,7 +148,7 @@ public class AlcatrazClient implements MoveListener, Serializable, Remote{
         
         String [] ServerList;
         ServerList = new String[1];
-        ServerList[0]="rmi://192.168.242.139:1099/Server2";
+        ServerList[0]="rmi:// 192.168.244.81/Server2";
         //ServerList[0]="rmi://192.168.0.102:1099/Server2";
 //        ServerList[1]="rmi://192.168.0.101:1099/Server1";
 //        ServerList[2]="rmi://192.168.0.102:1099/Server2";
@@ -157,7 +157,7 @@ public class AlcatrazClient implements MoveListener, Serializable, Remote{
         String primaryRMI=null;
 
         
-        
+        try{
         AlcatrazClient client = new AlcatrazClient();
         if(args.length>0){
             try {
@@ -176,8 +176,9 @@ public class AlcatrazClient implements MoveListener, Serializable, Remote{
            // stub = (RMIClientImpl) UnicastRemoteObject.exportObject(client.clientRMI, 0);
             
             // Bind the remote object's stub in the registry
-            client.registry.bind(client.username, client.clientRMI);
-        } catch (RemoteException | AlreadyBoundException ex) {
+            Naming.rebind(client.username, client.clientRMI);
+            //client.registry.bind(client.username, client.regserver);
+        } catch (RemoteException ex) {
             Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
         }
         
@@ -225,6 +226,10 @@ public class AlcatrazClient implements MoveListener, Serializable, Remote{
             } catch (RemoteException ex1) {
                 Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex1);
             }
+        }
+        }catch(RemoteException ex){
+            Logger.getLogger(AlcatrazClient.class.getName()).log(Level.SEVERE, null, ex);
+            System.exit(1);
         }
     }
     private boolean connectToServer(String[] ServerList){
