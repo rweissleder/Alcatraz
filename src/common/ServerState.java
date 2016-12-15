@@ -32,7 +32,7 @@ public class ServerState implements Cloneable, Serializable {
         }
     }
             int generation; // # of state
-            HashMap<String, String> RMIStrings;
+            HashMap<String, String> RMIStrings; //array of players with their corresponding RMI - String
             HashMap<String, ClientRMIPos> queue[]; // array of queues by amount of players to play with 
             HashMap<String, Integer> regNames; // names of players and amount of other players with which they want to play
             public ServerState getState(){
@@ -75,6 +75,7 @@ public class ServerState implements Cloneable, Serializable {
                 int i = queue[playercount-1].size();
                 queue[playercount-1].put(name, new ClientRMIPos(p, queue.length));
                 regNames.put(name, playercount - 1);
+                this.RMIStrings.put(name, RMIString);
                 generation++;
                 return true;
             };
@@ -86,6 +87,7 @@ public class ServerState implements Cloneable, Serializable {
                 queue[regNames.get(name)].remove(name);
                 regNames.remove(name);
                 generation++;
+                this.RMIStrings.remove(name);
                 return true;
             };
             
@@ -124,5 +126,7 @@ public class ServerState implements Cloneable, Serializable {
             public int getGeneration(){
                 return generation;
             }
-            
+            public HashMap<String, String> getRMIStrings(){
+                return RMIStrings;
+            }
         };

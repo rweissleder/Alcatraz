@@ -28,8 +28,8 @@ public class RMIClientImpl implements IRMIClient, Serializable{
     //Alcatraz other[] = new Alcatraz[4];
     
     public LinkedList<GameDraw> drawbuf = new LinkedList<>();
-    String RMIString;
-    int RMIPort;
+    static String RMIString;
+    static int RMIPort;
     public int performMove(Player player, Prisoner prisoner, int rowOrCol, int row, int col, int gamestep) throws RemoteException { 
         if(this.drawbuf.size() < gamestep-1){
             return gamestep;

@@ -10,8 +10,10 @@ import common.APlayer;
 import common.IAlcatrazServer;
 import common.IRMIClient;
 import java.io.BufferedReader;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
+import java.io.LineNumberReader;
 import java.io.Serializable;
 import java.net.InetAddress;
 import java.net.MalformedURLException;
@@ -42,13 +44,10 @@ public class AlcatrazServer implements Serializable, Remote {
 
     public String _serverHost;
     public int _spreadPort = 13335;
-    public String _serverName; /*= "RegServer";*/
-    //public String _backupServer = "backupServer";
+    public String _serverName; 
     public AlcatrazServerImpl server;
-    //public boolean primary;
     LinkedList<IRMIClient> buf;
-    //SpreadConnection connection; 
-    
+    public String allMembers = null;
     public AlcatrazServer(){
     //  server.state = new ServerState();
     }
@@ -96,13 +95,12 @@ public class AlcatrazServer implements Serializable, Remote {
     public class ServerSpread implements AdvancedMessageListener, Serializable {
         public String _serverHost;
         public int _spreadPort = 13335;
-        public String _serverName; /*= "RegServer";*/
-        //public String _backupServer = "backupServer";
-        //public boolean primary;
+        public String _serverName; 
+        public String _primaryServer;
+        public int _numberOfServers;
         LinkedList<IRMIClient> buf;
-        //SpreadConnection connection;
         SpreadConnection con = new SpreadConnection();
-        String GroupName; /*= "AlcatrazSpreadGroup";*/
+        String GroupName;
 
 
         public void init(ServerState state) throws RemoteException, IOException, SpreadException {
@@ -115,29 +113,18 @@ public class AlcatrazServer implements Serializable, Remote {
             }   catch(UnknownHostException e) {
                 e.printStackTrace();
             }
-            //Liest IP von Primary und Backup und Spread Gruppenname aus config.txt File ein.
+            //Ermittelt eigenen Namen, Gruppenname und Serveranzahl 
             FileReader fr = new FileReader("src/common/config.txt");
             BufferedReader br = new BufferedReader(fr);
             GroupName = br.readLine();
-            String srv1_ip = br.readLine();
-            String srv1_name = br.readLine();
-            String srv2_ip = br.readLine();
-            String srv2_name = br.readLine();
-            br.close();
-            System.out.println("Reading Spread config... "+srv1_name+": "+srv1_ip+"; "+srv2_name+": "+srv2_ip+"; ");
-
-            if (_serverHost.equals(srv1_ip)) {
-                _serverName = srv1_name;    
-                System.out.println("PrimaryServer / Name within SpreadGroup is: "+_serverName);
+            _numberOfServers = Integer.parseInt(br.readLine());
+            for (int i=0; i<_numberOfServers; i++) {
+                String serverip = br.readLine();
+                String servername = br.readLine();
+                    if (_serverHost.equals(serverip)) {
+                        _serverName = servername;    
+                }
             }
-            else if (_serverHost.equals(srv2_ip)){
-                _serverName = srv2_name;    
-                System.out.println("BackupServer / Name within SpreadGroup is: "+_serverName);
-            }
-            else {
-                System.out.println("IP-Address not in Spread config");
-            }
-
            //Connect to Spread Deamon
            try {
                con.add(this);
@@ -154,18 +141,54 @@ public class AlcatrazServer implements Serializable, Remote {
            //Join 
             try {
                 group.join(con, GroupName);
-               System.out.println("Successfully joined group: "+GroupName);
+           //    _primaryServer = electingPrimaryServer(group);
+               System.out.println("Successfully joined as '"+_serverName+"' to '"+GroupName+"' (Primary: "+_primaryServer+"; Number of servers: "+_numberOfServers+")");
             } catch (SpreadException exc) {
                System.out.println("Join failed");       
                 exc.printStackTrace();
             }
-
             System.out.println("Sending request for synchronisation...");
             sendSynchMsg("synch");
 
 
         }   //end of init
 
+        public String electingPrimaryServer(SpreadGroup group) throws FileNotFoundException, IOException, SpreadException {
+            FileReader fr = new FileReader("src/common/config.txt");
+            BufferedReader br = new BufferedReader(fr);
+            String primary = null;
+            
+            //hier Liste der Members auslesen
+            String members = con.getPrivateGroup().toString();
+            System.out.println("All members (1): "+members);
+
+            //ODER Liste selbst erzeugen
+            allMembers=_serverName;
+            SpreadMessage msg = new SpreadMessage();
+            msg.setObject("Who is in the group");
+            msg.addGroup(GroupName);
+            msg.setReliable();
+            msg.setSelfDiscard(true);
+            try {
+                con.multicast(msg);
+            } catch (SpreadException e) {
+                System.err.println("Could not send message...");
+            }
+            System.out.println("All members (2): "+allMembers);
+
+            br.readLine();  //Skip this line //Groupname
+            int c = Integer.parseInt(br.readLine()); //Line 2, number of servers
+            for (int i=0; i<c; i++) {                
+                br.readLine();  //Skip this line // IP
+                String nextMachine = br.readLine();
+                if (members.contains(nextMachine)) {
+                    primary = nextMachine;
+                    break;
+                }
+            }
+            return primary;
+        }
+        
         public void sendSynchMsg(String synch) throws RemoteException, SpreadException {
             SpreadMessage msg = new SpreadMessage();
             msg.setObject(synch);
@@ -181,7 +204,7 @@ public class AlcatrazServer implements Serializable, Remote {
 
         public void sendBackup() throws  SpreadException {
             SpreadMessage msg = new SpreadMessage();
-            System.out.println("ServerState:" + server.state);
+            //System.out.println("ServerState:" + server.state);
             msg.setObject(server.state);
             msg.addGroup(GroupName);
             msg.setReliable();
@@ -193,7 +216,7 @@ public class AlcatrazServer implements Serializable, Remote {
                 System.err.println("Could not send message from Method sendBackup....");
             }        
         }
-
+        
 
          //Methods for receiving Spread messages
         @Override
@@ -205,35 +228,55 @@ public class AlcatrazServer implements Serializable, Remote {
                 else {
                     try {
                         String verify = message.getObject().toString();
-                        if (verify.contains("synch")){
+                        if (verify.contains("synch") && _serverName.equals(_primaryServer)){
                             System.out.println("---NEW MESSAGE");
-                            System.out.println("New synchronisation message from "+message.getSender()+"received ");
-                            System.out.println("Message "+message.getClass()+", Content: "+message.getObject());
+                            System.out.println("New synchronisation message from "+message.getSender()+"received.");
+                            //System.out.println("Message "+message.getClass()+", Content: "+message.getObject());
+                            //System.out.println("Members: "+message.getMembershipInfo().getMembers());
                             System.out.println("---END OF MESSAGE");
                             // send current ServerState
-                            sendBackup();
+                            sendBackup(); 
+                            System.out.println("Primary server"+_serverName+"has sended ServerState...");
                         }
-                        //Liste mit Teams empfangen. Nr wird geprüft für Synchronisation.
-                        //Es kann auch eine Message für ein Backup sein (dann bräuchte man VersionsNr nicht prüfen aber es macht auch nichts wenn es gerüft wird
-                        //if ((x == 10) || (x == 15)) { }
                         else if (verify.contains("ServerState")){
-                            System.out.println("---NEW MESSAGE");
-                            System.out.println("New List of teams from "+message.getSender()+"received. Checking synchronisation...");
-                            System.out.println("Message "+message.getClass()+"; "+message.getObject());
-                            System.out.println("---END OF MESSAGE");
-                            ServerState state_received = new ServerState();
-                            state_received = (ServerState) message.getObject();
-                            System.out.println("...Synchronisation");
-                            System.out.println("...Empfangene Version: "+state_received.getGeneration());
-                            System.out.println("...Eigene Version    : "+server.state.getGeneration());
-                            if (state_received.getGeneration() > server.state.getGeneration()) {
-                                server.state = state_received;  //eigene Liste wird mit Liste received überschrieben
-                                System.out.println("...Liste wurde aktualisiert. Neue Version: "+server.state.getGeneration());
+                            if (_serverName.equals(_primaryServer)) {
+                                sendBackup(); //Bin ich Primary sende ich nun State an alle
                             }
-                            else if (state_received.getGeneration() <= server.state.getGeneration()) {
-                                System.out.println("...Kein Synch notwendig.");
-                            }
-                        }
+                            else if (message.getSender().toString().contains(_primaryServer))
+                                System.out.println("---NEW MESSAGE"); //State von Primary empfangen
+                                System.out.println(message.getObject()+" from "+message.getSender()+" received. Checking synchronisation...");
+                                //System.out.println("Message "+message.getClass()+"; "+message.getObject());
+                                System.out.println("---END OF MESSAGE");
+                                ServerState state_received = new ServerState();
+                                state_received = (ServerState) message.getObject();
+                                System.out.println("...Synchronisation");
+                                System.out.println("...Empfangene Version: "+state_received.getGeneration());
+                                System.out.println("...Eigene Version    : "+server.state.getGeneration());
+                                if (state_received.getGeneration() > server.state.getGeneration()) {
+                                    server.state = state_received;  //eigene Liste wird mit Liste received überschrieben
+                                    System.out.println("...Liste wurde aktualisiert. Neue Version: "+server.state.getGeneration());
+                                }
+                                else if (state_received.getGeneration() <= server.state.getGeneration()) {
+                                    System.out.println("...Kein Synch notwendig.");
+                                }
+                            //wird ein ServerState von Backup Server an Backup Server gesendet, so wird es ignoriert.
+                        }        
+                        else if (verify.contains("Who is in the group")) {
+                            SpreadMessage msg = new SpreadMessage();
+                            msg.setObject("I am in the group");
+                            msg.addGroup(GroupName);
+                            msg.setReliable();
+                            msg.setSelfDiscard(true);
+                            try {
+                                con.multicast(msg);
+                            } catch (SpreadException e) {
+                                System.err.println("Could not send message...");
+                            }  
+                        }        
+                        else if (verify.contains("I am in the group")) {
+                            String member = message.getSender().toString();
+                            allMembers=allMembers+member;
+                        }        
                         else {
                             System.out.println("Unknown message");
                         }
@@ -245,14 +288,71 @@ public class AlcatrazServer implements Serializable, Remote {
             } catch (SpreadException ex) {
                 Logger.getLogger(AlcatrazServer.class.getName()).log(Level.SEVERE, null, ex);
             }
-                        System.out.println("ServerState:" + server.state);
+                   //     System.out.println("ServerState:" + server.state);
 
         }
 
             public void membershipMessageReceived(SpreadMessage message) {
-                //not used
-            }
+                SpreadGroup getJoin         = message.getMembershipInfo().getJoined();
+                SpreadGroup getLeft         = message.getMembershipInfo().getLeft();
+                SpreadGroup getDisconnected = message.getMembershipInfo().getDisconnected();
+                if (getLeft!=null) {
+                    String leavingMember = getLeft.toString();
+                    System.out.println("Group Change: "+leavingMember+" left SpreadGroup");
+                    //System.out.println("Members: "+con.getPrivateGroup());
+                    if (leavingMember.contains(_primaryServer)) {
+                        try {
+                            _primaryServer = electingPrimaryServer(message.getSender());  //Primary server left... Choosing new Primary
+                            System.out.println(_primaryServer+" is now Primary");
+                        } catch (IOException ex) {
+                            Logger.getLogger(AlcatrazServer.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (SpreadException ex) {
+                            Logger.getLogger(AlcatrazServer.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                        /*Spread muss mir garantieren dass:
+                            - Jeder in Gruppe bekommt die Membership Nachricht
+                            - Jeder in Gruppe hat gleiche Sichtweise über Liste der Mitglieder
+                          Wenn Jeder in Gruppe dann aus config Liste den obersten Server wählt der in Gruppe ist,
+                           ist es demnach für jeden Member der gleiche Server
+                        */
+                    }
+                }
+                else if (getDisconnected!=null) {
+                    String disconnectedMember = getDisconnected.toString();
+                    System.out.println("Group Change: "+disconnectedMember+" left SpreadGroup");
+                    //System.out.println("Members: "+con.getPrivateGroup());
+                    if (disconnectedMember.contains(_primaryServer)) {
+                        try {
+                            _primaryServer = electingPrimaryServer(message.getSender());  //Primary server left... Choosing new Primary
+                            System.out.println(_primaryServer+" is now Primary"); 
+                        } catch (IOException ex) {
+                            Logger.getLogger(AlcatrazServer.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (SpreadException ex) {
+                            Logger.getLogger(AlcatrazServer.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }
+                }
+                else if (getJoin!=null) {
+                    String newMember = getJoin.toString();
+                    System.out.println("Group Change: "+newMember+" joined SpreadGroup");
+                    //System.out.println("Members: "+con.getPrivateGroup());
+                    //System.out.println("Members: "+message.getMembershipInfo().getMembers());
+                    /*if (newMember.contains(_primaryServer)) {
+                        try {
+                        _primaryServer = electingPrimaryServer(message.getSender());  //Primary server left... Choosing new Primary
+                        System.out.println("Primary "+_primaryServer+" joined SpreadGroup"); 
+                        } catch (IOException ex) {
+                            Logger.getLogger(AlcatrazServer.class.getName()).log(Level.SEVERE, null, ex);
+                        } catch (SpreadException ex) {
+                            Logger.getLogger(AlcatrazServer.class.getName()).log(Level.SEVERE, null, ex);
+                        }
+                    }*/
+                } 
+                else {
+                    System.out.println("Unknown membership message.");
+                }
 
+            }
 
 
     }

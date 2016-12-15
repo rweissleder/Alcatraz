@@ -19,8 +19,9 @@ import java.util.logging.Logger;
 import common.IRMIClient;
 import java.util.InputMismatchException;
 import common.*;
-import common.ServerState.ClientRMIPos;
-import commontest.ClientInterface;
+
+//import common.ServerState.ClientRMIPos;
+//import commontest.ClientInterface;
 import java.io.BufferedReader;
 import java.io.File;
 import java.io.FileReader;
@@ -36,7 +37,7 @@ import org.ini4j.Wini;
  * A test class initializing a local Alcatraz game -- illustrating how
  * to use the Alcatraz API.
  */
-public class AlcatrazClient implements MoveListener, Runnable, Remote{
+public class AlcatrazClient extends UnicastRemoteObject implements MoveListener, Runnable, Remote, Serializable, ClientInterface{
     private HashMap<String, String> opts;
     private HashMap<String, String> clients;
     private RMIClientImpl clientRMI;
@@ -67,7 +68,7 @@ public class AlcatrazClient implements MoveListener, Runnable, Remote{
     
     private int gamestep = 0;
     
-    public AlcatrazClient() throws java.net.UnknownHostException{
+    public AlcatrazClient() throws RemoteException{
         // IPString;
         //this.address = InetAddress.getLocalHost();
         clientRMI = new RMIClientImpl();
@@ -98,7 +99,7 @@ public class AlcatrazClient implements MoveListener, Runnable, Remote{
        // this.gameDrawBufferWatcher();
     }
     
-    private class RegServerParams{
+    private class RegServerParams implements Serializable{
         private String regservername = "RegServer";
         private String regserverip = "127.0.0.1";
         private int regserverport = 11010;
@@ -122,10 +123,12 @@ public class AlcatrazClient implements MoveListener, Runnable, Remote{
         this.other[i]=t;
     }
 
+    @Override
     public void gameWon(Player player) {
         System.out.println("Player " + player.getId() + " wins.");
     }
 
+    @Override
     public void moveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) {
         try { 
             otherMoveDone(player, prisoner, rowOrCol, row, col);
@@ -140,33 +143,38 @@ public class AlcatrazClient implements MoveListener, Runnable, Remote{
         //Übergabe RMI Aufrufe 
        // String rmi[] = rmiArray();
       
-        boolean lookup = false;
+       /* boolean lookup = false;
         int attempt = 1;
         System.out.println(clients);
         for (Map.Entry entry : this.clients.entrySet()) {
-            final String name = (String) entry.getKey();
-            final String location = (String) entry.getValue();
+            String name = (String) entry.getKey();
+            String location = (String) entry.getValue();
 
-            
-                        if (name != this.username) {   //exkludiert Spieler, der den Move macht (dem muss man RMI nicht schicken)
-                while (lookup==false) {
-                    try {  
-                        ClientInterface remoteinterface = (ClientInterface) Naming.lookup(name); //rmi Array           
+            if (!name.equals(this.username)) {   //exkludiert Spieler, der den Move macht (dem muss man RMI nicht schicken)
+                while (lookup == false) {
+                    try {
+                        ClientInterface remoteinterface = (ClientInterface) Naming.lookup(location); //rmi Array
+                        System.out.println(player);
+                        System.out.println(prisoner);
+                        System.out.println(rowOrCol);
+                        System.out.println(row);
+                        System.out.println(col);
+
                         remoteinterface.remoteMoveDone(player, prisoner, rowOrCol, row, col);
-                        System.out.println("Successfully done RMI "+name);
+                        System.out.println("Successfully done RMI " + location);
                         lookup = true;
                     } catch (Exception ex) {
-                         
-                        lookup=false;                    
-                        System.out.println(attempt +": Trying to reach Player "+ name+": "+location+": "+ex);
+
+                        lookup = false;
+                        System.out.println(attempt + ": Trying to reach Player " + name + ": " + location + ": " + ex);
                         attempt++;
                         Thread.sleep(5000);
                         // Logger.getLogger(Test.class.getName()).log(Level.SEVERE, null, ex);
                       }  
                 }
             } 
-        }
-      /*  boolean lookup=false;
+        }*/
+        boolean lookup=false;
         int attempt = 1;
         for (int k = 0; k < getNumPlayer(); k++) {   //Geht rmi Array durch und schickt rmi dorthin
             if (k != player.getId()) {   //exkludiert Spieler, der den Move macht (dem muss man RMI nicht schicken)
@@ -186,10 +194,11 @@ public class AlcatrazClient implements MoveListener, Runnable, Remote{
                       }  
                 }
             }       
-        } */  
+        }  
     }
     
        //Methode empfängt Move und führt diesen Remote bei anderen Spielern durch
+    @Override
     public void remoteMoveDone(Player player, Prisoner prisoner, int rowOrCol, int row, int col) throws RemoteException {
        // String rmi[] = rmiArray(); 
         //doMove wird für ID des Spielers durchgeführt dessen Zug übergeben wurde
@@ -290,8 +299,8 @@ public class AlcatrazClient implements MoveListener, Runnable, Remote{
         
         String ownRMI="rmi://" + hostIP + ":" + randomPort + "/" + client.username;
 
-        Registry registry = LocateRegistry.createRegistry(randomPort);
-        registry.bind (client.username, client);
+        LocateRegistry.createRegistry(randomPort);
+        Naming.rebind(ownRMI, client);
                 
                 
         if(args.length>0){
@@ -402,7 +411,7 @@ public class AlcatrazClient implements MoveListener, Runnable, Remote{
         return 0;
     } 
     
-    void startGame(int playerCount, int position){
+    void startGame(int playerCount, int position) throws RemoteException{
        
       
        
@@ -447,8 +456,7 @@ public class AlcatrazClient implements MoveListener, Runnable, Remote{
        alca.getPlayer(ownPosition).setName(username);
        for(int i=0;i<numPlayer;i++){
           alca.getPlayer(i).setName(clientNames[i]);
-          
-          if(i!=ownPosition){
+          if(this.ownPosition != i){
              this.setOther(i, alca);             
           }
        System.out.println("Spieler " + (i+1) + ": " + clientNames[i] + ", Position: " + i);
@@ -457,7 +465,9 @@ public class AlcatrazClient implements MoveListener, Runnable, Remote{
        alca.showWindow();
        alca.addMoveListener(this);    
        alca.start();
-       
+      if(this.regserver.unregister(username) != 0){
+                        throw new RemoteException();
+                    } 
     }
     public void parseConfigFile(String config) throws IOException{
         Wini ini = new Wini(new File(config));

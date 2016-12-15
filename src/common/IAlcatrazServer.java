@@ -31,5 +31,5 @@ public interface IAlcatrazServer extends Remote{
      */
     //public boolean stillAlive(IRMIClient p) throws RemoteException;
     public boolean isTeamReady(String name) throws RemoteException;
-    public HashMap<String, ServerState.ClientRMIPos> start(String name) throws RemoteException;
+    public HashMap<String, String> start(String name) throws RemoteException;
 }

@@ -73,12 +73,12 @@ public class AlcatrazServerImpl extends UnicastRemoteObject implements IAlcatraz
          * @return
          * @throws RemoteException
          */
-        public HashMap<String, ServerState.ClientRMIPos> start(String name) throws RemoteException {
-            HashMap<String, ServerState.ClientRMIPos> res = state.getPlayers(name);
+        public HashMap<String, String> start(String name) throws RemoteException {
+           // HashMap<String, ServerState.ClientRMIPos> res = state.getPlayers(name);
             //TODO
             //this.playersInPlay.add(name);
             //backup
-            
+            HashMap<String, String> res = state.getRMIStrings();
             return res;
         }
         
